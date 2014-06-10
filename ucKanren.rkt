@@ -1,9 +1,15 @@
 #lang racket
-(provide == conj disj call/fresh)
+(provide == conj disj call/fresh var var? var=? walk)
 
 (define (var c) (vector c))
 (define (var? x) (vector? x))
 (define (var=? x1 x2) (= (vector-ref x1 0) (vector-ref x2 0)))
+
+(define (assp f ls)
+  (cond
+    ((null? ls) #f)
+    ((f (caar ls)) ls)
+    (else (assp f (cdr ls)))))
 
 (define (walk u s)
   (let ((pr (and (var? u) (assp (lambda (v) (var=? u v)) s))))
