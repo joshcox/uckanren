@@ -1,23 +1,13 @@
 #lang racket
+(require C311/trace)
+(require "cell-struct.rkt")
 (provide == conj disj call/fresh var var? var=? walk)
 
-(define (var c) (vector c))
-(define (var? x) (vector? x))
-(define (var=? x1 x2) (= (vector-ref x1 0) (vector-ref x2 0)))
+(define (var c) (box c))
+(define (var=? x1 x2) (= (unbox x1) (unbox x2)))
 
-(define (assp f ls)
-  (cond
-    ((null? ls) #f)
-    ((f (caar ls)) ls)
-    (else (assp f (cdr ls)))))
-
-(define (walk u s)
-  (let ((pr (and (var? u) (assp (lambda (v) (var=? u v)) s))))
-    (if pr (walk (cdr pr) s) u)))
-
-(define (ext-s x v s) `((,x . ,v) . ,s))
-
-(define (== u v)
+;;original unify
+(define (=== u v)
   (lambda (s/c)
     (let ((s (unify u v (car s/c))))
       (if s (unit `(,s . ,(cdr s/c))) mzero))))
@@ -25,21 +15,10 @@
 (define (unit s/c) (cons s/c mzero))
 (define mzero '())
 
-(define (unify u v s)
-  (let ((u (walk u s)) (v (walk v s)))
-    (cond
-      ((and (var? u) (var? v) (var=? u v)) s)
-      ((var? u) (ext-s u v s))
-      ((var? v) (ext-s v u s))
-      ((and (pair? u) (pair? v))
-       (let ((s (unify (car u) (car v) s)))
-         (and s (unify (cdr u) (cdr v) s))))
-      (else (and (eqv? u v) s)))))
-
 (define (call/fresh f)
   (lambda (s/c)
     (let ((c (cdr s/c)))
-      ((f (var c)) `(,(car s/c) . ,(+ c 1))))))
+      ((f (var c)) `(,(allocate (car s/c)) . ,(add1 c))))))
 
 ;; microKanren's core - the above is the representation of states and must be 
 ;; changed to make way for our constraint system.

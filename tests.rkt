@@ -1,10 +1,17 @@
 #lang racket/base
 (require rackunit rackunit/text-ui "mK.rkt" "test-programs.rkt")
-(provide microKanren-tests run-tests)
+(provide all-tests state-tests mk-tests)
 
 ;; tests
 
-(define microKanren-tests
+(define state-test-suites
+  (test-suite "state-tests"
+
+    (check = 1 1)
+    
+    ))
+
+(define microKanren-test-suites
   (test-suite "microKanren-tests"
 
     (check-equal?                
@@ -110,4 +117,12 @@
               
               ))
 
-(run-tests microKanren-tests)
+(define (all-tests)
+  (run-tests microKanren-test-suites)
+  (run-tests state-test-suites))
+
+(define (mk-tests)
+  (run-tests microKanren-test-suites))
+
+(define (state-tests)
+  (run-tests state-test-suites))
