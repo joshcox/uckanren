@@ -1,75 +1,86 @@
 #lang racket
 (require C311/trace)
-(require (only-in "c-f-union-find.rkt" make-initial-u-f union find allocate-new-index))
-(require data/hamt)
-(provide unify empty-state allocate var? walk)
+(require (only-in data/p-union-find
+		  make-initial-u-f union find allocate-new-index))
+(provide make-state
+         var var-name var? var=?
+	 empty-state/u-f
+	 make-initial-cell
+	 allocate
+	 walk val-walk
+	 set-cell-value
+	 union
+	 state-u-f state-cells)
+
+(define-struct cell (val dom cs) #:mutable)
+(define-struct state (u-f cells) #:mutable)
+
+;; What's a var? It's a representation of the cell underneath.
+;;  This time... a box.
+(define (var v) (box v))
+(define (var-name v) (unbox v))
+(define (var? v) (box? v))
+(define (var=? v1 v2) (eqv? (var-name v1) (var-name v2)))
 
 #|
-  cells - module
-  This module maintains our state/cells. It provides us functionality
-  to:
-  1. Create a state
-  2. Manage equivalence classes through use of union-find
-  3. Merge Cells
-  4. Add Cells (representative node in u-f structure)
-  5. Run constraint store
+  Creators
 |#
 
+;; empty-state: create an empty state to be used with each run
+(define (empty-state/u-f) (make-state (make-initial-u-f 256) (hasheqv)))
 
-(define-struct c (val dom cs))
-(define-struct state (u-f c*))
+;; make-initial-cell: initialize a cell for the first time
+(define dummy-val 'dne)
+(trace-define (dummy-val? val) (eqv? dummy-val val)) 
+(trace-define (make-initial-cell v s)
+  (hash-ref (hash-set (state-cells s) v (make-cell 'fresh '() '())) v 'dne))
 
-(define (var? x) (box? x))
+;; allocate-new-index-u-f: given an entire u-f structure `(,u-f . ,r),
+;;   we want to keep the entire thing
+(trace-define (allocate-new-index-u-f u-f)
+  (let ((pnl (car u-f)) (r (cdr u-f)))
+    (let ((pnl^ (allocate-new-index pnl)))
+      (cons pnl^ r))))
 
-;;empty-state - first state created
-(define (empty-state)
-  (make-state (make-initial-u-f size) (hasheqv)))
+;;allocate new variable index when creating a new fresh variable
+(trace-define (allocate s)
+  (make-state (allocate-new-index-u-f (state-u-f s)) (state-cells s)))
 
-;;allocate - create new index in u-f
-(define (allocate state)
-  (make-state (allocate-new-index (state-u-f state))
-	      (state-c* state)))
+#|
+  Accessors
+|#
 
-;;walk - given a var, return the cell
-(define (walk var s)
-  (let ((var^ (unbox var)))
-    (let ((u-f (state-u-f s)))
-      (let ((rep (find u-f var^)))
-	(let ((cells (state-c* s)))
-	  (hash-ref cells rep #f))))))
+;; lookup-cell: looks up a cell in the state-cells
+;; takes a var-name, not a var
+(trace-define (lookup-cell v cells)
+  (hash-ref cells v 'dne))
 
-;;if using *only* unify
-(define unify
-  (lambda (u^ v^ s)
-    (let ((u (walk u^ s))
-	  (v (walk v^ s)))
-      (let ((u (c-val u))
-	    (v (c-val v)))
-	(cond
-	 ((eq? u v) s)
-	 ((var? u) (ext-s u v s))
-	 ((var? v) (ext-s v u s))
-	 ((and (pair? u) (pair? v))
-	  (let ((s (unify (car u) (car v) s)))
-	    (and s (unify (cdr u) (cdr v) s))))
-	 (else (and (eqv? u v) s)))))))
+;; walk: var, state -> given a var, returns the cell mapped to the rep
+;; takes var, returns var || cell
+(trace-define (walk v s)
+  (cond
+   ((not (var? v)) v)
+   (else (let ((u-f (state-u-f s)) (cells (state-cells s)))
+	   (let ((rep (find u-f (var-name v)))) ;backwards
+	     (lookup-cell rep cells))))))
 
-(define ext-s
-  (lambda (x v s)
+;; val-walk: walks to cell, returns val out
+;; takes var || cell, returns var || cell-val
+(trace-define (val-walk v s)
+  (let ((c (walk v s)))
     (cond
-     ((var? v)
-      (make-state (union (state-u-f s) x v)
-		  (state-ht s)))
-     ((occurs? x v s) #f)
-     (else
-      (make-state (state-u-f s)
-		  (hash-set (state-ht s) x v))))))
+     ; return root for unify's benefit
+     ((dummy-val? c) (var (find (state-u-f s) (var-name v)))) ;constant-op
+     ((cell? c) (cell-val c))
+     (else v))))
 
-(define occurs?
-  (lambda (x v s)
-    (let ((v (s-walk v s)))
-      (cond
-       ((var? v) (= x v))
-       ((pair? v) (or (occurs? x (car v) s)
-		      
+#|
+  Setters
+|#
 
+;; set-cell-value
+(trace-define (set-cell-value x v s)
+  (let ((c (walk x s)))
+    (if (cell? c)
+	(set-cell-val! c v)
+	(set-cell-val! (make-initial-cell x s) v))))
