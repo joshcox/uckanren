@@ -1,18 +1,17 @@
 #lang racket
 (require C311/trace)
-(require "cell-struct.rkt")
-(provide == conj disj call/fresh var var? var=? walk)
+(require "unify.rkt")
+(provide empty-state == conj disj call/fresh var var? var=? walk val-walk)
 
-(define (var c) (box c))
-(define (var=? x1 x2) (= (unbox x1) (unbox x2)))
+(trace-define (empty-state) `(,(empty-state/u-f) . 0))
 
 ;;original unify
-(define (=== u v)
+(trace-define (== u v)
   (lambda (s/c)
     (let ((s (unify u v (car s/c))))
       (if s (unit `(,s . ,(cdr s/c))) mzero))))
 
-(define (unit s/c) (cons s/c mzero))
+(trace-define (unit s/c) (cons s/c mzero))
 (define mzero '())
 
 (define (call/fresh f)

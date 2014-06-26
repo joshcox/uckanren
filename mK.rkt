@@ -42,9 +42,7 @@
     ((_ (x ...) g0 g ...)
      (map reify-1st (take-all (call/goal (fresh (x ...) g0 g ...)))))))
 
-(define empty-state '(() . 0))
-
-(define (call/goal g) (g empty-state))
+(define (call/goal g) (g (empty-state)))
 
 (define (pull $)
   (if (procedure? $) (pull ($)) $))
