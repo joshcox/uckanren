@@ -31,19 +31,19 @@
 
 ;; make-initial-cell: initialize a cell for the first time
 (define dummy-val 'dne)
-(trace-define (dummy-val? val) (eqv? dummy-val val)) 
-(trace-define (make-initial-cell v s)
+(define (dummy-val? val) (eqv? dummy-val val)) 
+(define (make-initial-cell v s)
   (hash-ref (hash-set (state-cells s) v (make-cell 'fresh '() '())) v 'dne))
 
 ;; allocate-new-index-u-f: given an entire u-f structure `(,u-f . ,r),
 ;;   we want to keep the entire thing
-(trace-define (allocate-new-index-u-f u-f)
+(define (allocate-new-index-u-f u-f)
   (let ((pnl (car u-f)) (r (cdr u-f)))
     (let ((pnl^ (allocate-new-index pnl)))
       (cons pnl^ r))))
 
 ;;allocate new variable index when creating a new fresh variable
-(trace-define (allocate s)
+(define (allocate s)
   (make-state (allocate-new-index-u-f (state-u-f s)) (state-cells s)))
 
 #|
@@ -52,12 +52,12 @@
 
 ;; lookup-cell: looks up a cell in the state-cells
 ;; takes a var-name, not a var
-(trace-define (lookup-cell v cells)
+(define (lookup-cell v cells)
   (hash-ref cells v 'dne))
 
 ;; walk: var, state -> given a var, returns the cell mapped to the rep
 ;; takes var, returns var || cell
-(trace-define (walk v s)
+(define (walk v s)
   (cond
    ((not (var? v)) v)
    (else (let ((u-f (state-u-f s)) (cells (state-cells s)))
@@ -66,7 +66,7 @@
 
 ;; val-walk: walks to cell, returns val out
 ;; takes var || cell, returns var || cell-val
-(trace-define (val-walk v s)
+(define (val-walk v s)
   (let ((c (walk v s)))
     (cond
      ; return root for unify's benefit
@@ -79,7 +79,7 @@
 |#
 
 ;; set-cell-value
-(trace-define (set-cell-value x v s)
+(define (set-cell-value x v s)
   (let ((c (walk x s)))
     (if (cell? c)
 	(set-cell-val! c v)

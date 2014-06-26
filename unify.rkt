@@ -8,7 +8,7 @@
          allocate
          empty-state/u-f)
 
-(trace-define (unify u^ v^ s)
+(define (unify u^ v^ s)
   (let ((u (val-walk u^ s))
         (v (val-walk v^ s)))
     (cond
@@ -20,7 +20,7 @@
         (and s (unify (cdr u) (cdr v) s))))
      (else (and (eqv? u v) s))))) ;;this line?
 
-(trace-define ext-s
+(define ext-s
   (lambda (x v s)
     (cond
      ((var? v)
@@ -33,7 +33,7 @@
       (make-state (state-u-f s)
                   (set-cell-value x v s))))))
 
-(trace-define occurs?
+(define occurs?
   (lambda (x v s)
     (let ((v (val-walk v s)))
       (cond
