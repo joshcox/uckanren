@@ -1,89 +1,60 @@
 #lang racket
 (require C311/trace)
 (require (only-in data/p-union-find
-		  make-initial-u-f union find allocate-new-index))
-(provide make-state
-         var var-name var? var=?
-	 empty-state/u-f
-	 make-initial-cell
-	 allocate
-	 walk val-walk
-	 set-cell-value
-	 union
-	 state-u-f state-cells
-         cell-val)
+                  make-initial-u-f union find allocate-new-index))
 
-(define-struct cell (val dom cs) #:mutable)
-(define-struct state (u-f cells) #:mutable)
+(provide allocate unify var? walk empty-state)
 
-;; What's a var? It's a representation of the cell underneath.
-;;  This time... a box.
-(trace-define (var v) (box v))
-(trace-define (var-name v) (unbox v))
-(trace-define (var? v) (box? v))
-(trace-define (var=? v1 v2) (eqv? (var-name v1) (var-name v2)))
 
-#|
-  Creators
-|#
+(define (make-state u-f cells)
+  (hasheqv 'u-f u-f
+           'cells cells))
+(define (empty-cell) (hasheqv 'value 'dummy 'constraints '()))
+(define (empty-cells) (hasheqv))
+(define (empty-state)
+  `(,(make-state (make-initial-u-f 256) (empty-cells)) . 0))
 
-;; empty-state: create an empty state to be used with each run
-(trace-define (empty-state/u-f) (make-state (make-initial-u-f 256) (hasheqv)))
+;;microKanren variables
+(define (var v) (box v))
+(define (var-name v) (unbox v))
+(define (var? v) (box? v))
+(define (var=? v1 v2) (eqv? (var-name v1) (var-name v2)))
 
-;; make-initial-cell: initialize a cell for the first time
-(define dummy-val 'dne)
-(trace-define (dummy-val? val) (eqv? dummy-val val)) 
-(trace-define (make-initial-cell v s)
-  (hash-ref (hash-set (state-cells s) v (make-cell 'fresh '() '())) v 'dne))
+(define (allocate s)
+  (make-state (allocate-new-index (hash-ref s 'u-f)) (hash-ref s 'cells)))
 
-;; allocate-new-index-u-f: given an entire u-f structure `(,u-f . ,r),
-;;   we want to keep the entire thing
-(trace-define (allocate-new-index-u-f u-f)
-  (let ((pnl (car u-f)) (r (cdr u-f)))
-    (let ((pnl^ (allocate-new-index pnl)))
-      (cons pnl^ r))))
-
-;;allocate new variable index when creating a new fresh variable
-(trace-define (allocate s)
-  (make-state (allocate-new-index-u-f (state-u-f s)) (state-cells s)))
-
-#|
-  Accessors
-|#
-
-;; lookup-cell: looks up a cell in the state-cells
-;; takes a var-name, not a var
-(trace-define (lookup-cell v cells)
-  (hash-ref cells v 'dne))
-
-;; walk: var, state -> given a var, returns the cell mapped to the rep
-;; takes var, returns var || cell
-(trace-define (walk v s)
+(define (walk v s)
   (cond
    ((not (var? v)) v)
-   (else (let ((u-f (state-u-f s)) (cells (state-cells s)))
-	   (let ((rep (find u-f (var-name v)))) ;backwards
-	     (lookup-cell rep cells))))))
+   ((let ((root (find (hash-ref s 'u-f) (var-name v))))
+      (let ((cell (hash-ref (hash-ref s 'cells) root #f)))
+        (if cell cell root)))))) ;;return cell or root
 
-;; val-walk: walks to cell, returns val out
-;; takes var || cell, returns var || cell-val
-(trace-define (val-walk v s)
-  (let ((c (walk v s)))
+;;unification
+(define (unify u^ v^ s)
+  (let ((u (walk u^ s))
+        (v (walk v^ s)))
     (cond
-     ; return root for unify's benefit
-     ((dummy-val? c) (var (find (state-u-f s) (var-name v)))) ;constant-op
-     ((cell? c) (cell-val c))
-     (else v))))
+     ((eqv? u v) s) ;;possible *not* vars
+     ((var? u) (ext-s u v s))
+     ((var? v) (ext-s v u s))
+     ((and (pair? u) (pair? v))
+      (let ((s (unify (car u) (car v) s)))
+        (and s (unify (cdr u) (cdr v) s))))
+     (else (and (eqv? u v) s)))))
 
-#|
-  Setters
-|#
+(define (ext-s x v s)
+  (cond
+   ((var? v) (make-state (union (hash-ref s 'u-f) (var-name x) (var-name v))))
+   ((occurs? x v s) #f)
+   (else
+    (let ((cell (hash-set (empty-cell) 'value v)))
+      (make-state (hash-ref s 'u-f) (hash-set (hash-ref s 'cells) (var-name x) cellbn))))))
 
-;; set-cell-value
-
-(trace-define (set-cell-value x v s)
-  (let ((c (walk x s)))
-    (if (cell? c)
-        (begin (set-cell-val! c v) c)
-        (let ((c (make-initial-cell x s)))
-          (begin (set-cell-val! c v) c)))))
+(define (occurs? x v s)
+  (let ((v (walk v s)))
+    (cond
+     ((var? v) (= x v))
+     ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
+     (else #f))))
+;;end unification

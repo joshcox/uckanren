@@ -1,17 +1,15 @@
 #lang racket
 (require C311/trace)
-(require "unify.rkt")
-(provide empty-state == conj disj call/fresh var var? var=? walk val-walk)
-
-(trace-define (empty-state) `(,(empty-state/u-f) . 0))
+(require "state.rkt")
+(provide empty-state == conj disj call/fresh var var? var=? walk)
 
 ;;original unify
-(trace-define (== u v)
+(define (== u v)
   (lambda (s/c)
     (let ((s (unify u v (car s/c))))
       (if s (unit `(,s . ,(cdr s/c))) mzero))))
 
-(trace-define (unit s/c) (cons s/c mzero))
+(define (unit s/c) (cons s/c mzero))
 (define mzero '())
 
 (define (call/fresh f)
