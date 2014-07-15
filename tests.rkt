@@ -1,128 +1,20 @@
-#lang racket/base
-(require rackunit rackunit/text-ui "mK.rkt" "test-programs.rkt")
-(provide all-tests state-tests mk-tests)
+#lang racket
+(require "mK.rkt" "test-programs.rkt")
 
-;; tests
+(define-syntax multi-test
+  (syntax-rules ()
+    ((_ title tested-expression expected-result* ...)
+     (let* ((produced tested-expression))
+       (cond
+        [(equal? produced expected-result*) (printf "~s works!\n" title)]
+        ...
+        [else (error
+               'test
+               "Failed ~s: ~s~nComputed: ~s~nExpected one of: ~s~n"
+               title 'tested-expression produced (list
+                                                  expected-result* ...))])))))
 
-(define state-test-suites
-  (test-suite "state-tests"
 
-    (check = 1 1)
-    
-    ))
-
-(define microKanren-test-suites
-  (test-suite "microKanren-tests"
-
-    (check-equal?                
-      (let (($ ((call/fresh (lambda (q) (== q 5))) empty-state)))
-        (car $))
-      '(((#(0) . 5)) . 1) 
-      "second-set t1")
-
-    (check-equal?                
-      (let (($ ((call/fresh (lambda (q) (== q 5))) empty-state)))
-        (cdr $))
-      '() 
-      "second-set t2")
-
-    (check-equal?                
-      (let (($ (a-and-b empty-state))) (car $))
-      '(((#(1) . 5) (#(0) . 7)) . 2) 
-      "second-set t3")
-
-    (check-equal?                
-      (let (($ (a-and-b empty-state))) (take 1 $))
-      '((((#(1) . 5) (#(0) . 7)) . 2)) 
-      "second-set t3, take")
-
-    (check-equal?               
-      (let (($ (a-and-b empty-state)))
-        (car (cdr $)))
-      '(((#(1) . 6) (#(0) . 7)) . 2) 
-      "second-set t4")
-
-    (check-equal?                
-      (let (($ (a-and-b empty-state)))
-        (cdr (cdr $)))
-      '() 
-      "second-set t5")
-
-    (check-equal?                
-      (let (($ ((call/fresh (lambda (q) (fives q))) empty-state)))
-        (take 1 $))
-      '((((#(0) . 5)) . 1)) 
-      "who cares")
-
-    (check-equal?                
-      (let (($ (a-and-b empty-state))) (take 2 $))
-      '((((#(1) . 5) (#(0) . 7)) . 2)
-        (((#(1) . 6) (#(0) . 7)) . 2)) 
-      "take 2 a-and-b stream")
-
-    (check-equal?                
-      (let (($ (a-and-b empty-state))) (take-all $))
-      '((((#(1) . 5) (#(0) . 7)) . 2)
-        (((#(1) . 6) (#(0) . 7)) . 2)) 
-      "take-all a-and-b stream")
-
-#|
-    (check-equal?                
-      (car ((ground-appendo empty-state)))
-      '(((#(2) b) (#(1)) (#(0) . a)) . 3) 
-      "ground appendo")
-
-    (check-equal?                
-      (car ((ground-appendo2 empty-state)))
-      '(((#(2) b) (#(1)) (#(0) . a)) . 3) 
-      "ground appendo2")
-
-    (check-equal?                
-      (take 2 (call-appendo empty-state))
-      '((((#(0) #(1) #(2) #(3)) 
-          (#(2) . #(3)) (#(1))) . 4)
-        (((#(0) #(1) #(2) #(3)) 
-          (#(2) . #(6)) 
-          (#(5)) 
-          (#(3) #(4) . #(6)) 
-          (#(1) #(4) . #(5))) . 7)) 
-      "appendo")
-
-    (check-equal?                
-      (take 2 (call-appendo2 empty-state))
-      '((((#(0) #(1) #(2) #(3)) (#(2) . #(3)) (#(1))) . 4) 
-        (((#(0) #(1) #(2) #(3)) 
-          (#(3) #(4) . #(6))
-          (#(2) . #(6)) 
-          (#(5)) 
-          (#(1) #(4) . #(5))) . 7)) 
-      "appendo2")
-
-    (check-equal?                
-      (map reify-1st (take 2 (call-appendo empty-state)))
-      '((() _.0 _.0) ((_.0) _.1 (_.0 . _.1))) 
-      "reify-1st across appendo")
-
-    (check-equal? 
-      (map reify-1st (take 2 (call-appendo2 empty-state)))
-      '((() _.0 _.0) ((_.0) _.1 (_.0 . _.1))) 
-      "reify-1st across appendo2")
-
-    (check-equal? 
-      (take 1 (many-non-ans empty-state))
-      '((((#(0) . 3)) . 1)) 
-      "many non-ans")
-|#
-
-              
-              ))
-
-(define (all-tests)
-  (run-tests microKanren-test-suites)
-  (run-tests state-test-suites))
-
-(define (mk-tests)
-  (run-tests microKanren-test-suites))
-
-(define (state-tests)
-  (run-tests state-test-suites))
+(multi-test "appendo"
+  (run* (q) (appendo '(1 2 3) '(4 5 6) q))
+  '((1 2 3 4 5 6)))
