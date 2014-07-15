@@ -1,7 +1,7 @@
 #lang racket
 (require C311/trace)
 (require "state.rkt")
-(provide empty-state == conj disj call/fresh var var? var=? walk)
+(provide empty-state == conj disj call/fresh var var? walk)
 
 ;;original unify
 (define (== u v)

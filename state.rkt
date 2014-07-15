@@ -3,7 +3,7 @@
 (require (only-in data/p-union-find
                   make-initial-u-f union find allocate-new-index))
 
-(provide allocate unify var? walk empty-state)
+(provide allocate unify var var? walk empty-state)
 
 
 (define (make-state u-f cells)
@@ -21,14 +21,14 @@
 (define (var=? v1 v2) (eqv? (var-name v1) (var-name v2)))
 
 (define (allocate s)
-  (make-state (allocate-new-index (hash-ref s 'u-f)) (hash-ref s 'cells)))
+  (make-state (cons (allocate-new-index (car (hash-ref s 'u-f))) (cdr (hash-ref s 'u-f))) (hash-ref s 'cells)))
 
 (define (walk v s)
   (cond
    ((not (var? v)) v)
    ((let ((root (find (hash-ref s 'u-f) (var-name v))))
       (let ((cell (hash-ref (hash-ref s 'cells) root #f)))
-        (if cell cell root)))))) ;;return cell or root
+        (if cell (hash-ref cell 'value) (var root))))))) ;;return cell or root
 
 ;;unification
 (define (unify u^ v^ s)
@@ -49,12 +49,12 @@
    ((occurs? x v s) #f)
    (else
     (let ((cell (hash-set (empty-cell) 'value v)))
-      (make-state (hash-ref s 'u-f) (hash-set (hash-ref s 'cells) (var-name x) cellbn))))))
+      (make-state (hash-ref s 'u-f) (hash-set (hash-ref s 'cells) (var-name x) cell))))))
 
 (define (occurs? x v s)
   (let ((v (walk v s)))
     (cond
-     ((var? v) (= x v))
+     ((var? v) (var=? x v)) ;;use var=? since we are testing that variables are the same. var = box(number)
      ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
      (else #f))))
 ;;end unification
