@@ -90,3 +90,29 @@
      ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
      (else #f))))
 ;;end unification
+
+#|
+(define (make-goal f)
+  (lambda (s/c)
+    (cond
+     ((f (car s/c)) => unit)
+     (else mzero))))
+
+(define add-content
+  (lambda (var info state)
+    (let ((cell (walk var state)))
+      (cond
+       ((dummy? info) state)
+       ((dummy? (hash-ref cell 'value))
+        (hash-set cell 'value info)
+        ;;propagate here
+        )
+       (else (if (eqv? (hash-ref cell 'value) info)
+                 state
+                 #f))))))
+
+(define new-neighbor
+  (lambda (cell neighbor state)
+    (let )))
+
+|#
