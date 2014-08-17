@@ -5,20 +5,6 @@
 
 (provide (all-defined-out))
 
-;;original unify
-(define (== u v)
-  (lambda (s/c)
-    (let ((s (unify u v (car s/c))))
-      (if s (unit `(,s . ,(cdr s/c))) mzero))))
-
-(define (unit s/c) (cons s/c mzero))
-(define mzero '())
-
-(define (call/fresh f)
-  (lambda (s/c)
-    (let ((c (cdr s/c)))
-      ((f (var c)) `(,(allocate (car s/c)) . ,(add1 c))))))
-
 ;; microKanren's core - the above is the representation of states and must be 
 ;; changed to make way for our constraint system.
 
@@ -38,6 +24,20 @@
     (else (mplus (g (car $)) (bind (cdr $) g)))))
 ;;end microKanren
 
+;;original unify
+(define (== u v)
+  (lambda (s/c)
+    (let ((s (unify u v (car s/c))))
+      (if s (unit `(,s . ,(cdr s/c))) mzero))))
+
+(define (unit s/c) (cons s/c mzero))
+(define mzero '())
+
+(define (call/fresh f)
+  (lambda (s/c)
+    (let ((c (cdr s/c)))
+      ((f (var c)) `(,(allocate (car s/c)) . ,(add1 c))))))
+
 (define (make-state u-f cells)
   (hasheqv 'u-f u-f
            'cells cells))
@@ -46,6 +46,18 @@
 (define (empty-state)
   `(,(make-state (make-initial-u-f 256) (empty-cells)) . 0))
 
+;;accessors
+(define (get-u-f s)
+  (hash-ref s 'u-f))
+(define (get-cells s)
+  (hash-ref s 'cells))
+(define (get-cell x s)
+  (hash-ref (get-cells s) x #f))
+(define (get-cell-value c)
+  (hash-ref c 'value))
+(define (get-cell-constraints c)
+  (hash-ref c 'constraints))
+
 ;;microKanren variables
 (define (var v) (box v))
 (define (var-name v) (unbox v))
@@ -53,14 +65,15 @@
 (define (var=? v1 v2) (eqv? (var-name v1) (var-name v2)))
 
 (define (allocate s)
-  (make-state (cons (allocate-new-index (car (hash-ref s 'u-f))) (cdr (hash-ref s 'u-f))) (hash-ref s 'cells)))
+  (let ((u-f (get-u-f s)))
+    (make-state (cons (allocate-new-index (car u-f)) (cdr u-f)) (get-cells s))))
 
 (define (walk v s)
   (cond
    ((not (var? v)) v)
-   ((let ((root (find (hash-ref s 'u-f) (var-name v))))
-      (let ((cell (hash-ref (hash-ref s 'cells) root #f)))
-        (if cell (hash-ref cell 'value) (var root))))))) ;;return cell or root
+   ((let ((root (find (get-u-f s) (var-name v))))
+      (let ((cell (get-cell root s)))
+        (if cell (get-cell-value cell) (var root))))))) ;;return cell or root
 
 ;;unification
 (define (unify u^ v^ s)
@@ -77,11 +90,11 @@
 
 (define (ext-s x v s)
   (cond
-   ((var? v) (make-state (union (hash-ref s 'u-f) (var-name x) (var-name v))))
+   ((var? v) (make-state (union (get-u-f s) (var-name x) (var-name v))))
    ((occurs? x v s) #f)
    (else
     (let ((cell (hash-set (empty-cell) 'value v)))
-      (make-state (hash-ref s 'u-f) (hash-set (hash-ref s 'cells) (var-name x) cell))))))
+      (make-state (get-u-f s) (hash-set (get-cells s) (var-name x) cell))))))
 
 (define (occurs? x v s)
   (let ((v (walk v s)))
@@ -92,27 +105,37 @@
 ;;end unification
 
 #|
-(define (make-goal f)
-  (lambda (s/c)
-    (cond
-     ((f (car s/c)) => unit)
-     (else mzero))))
+(define (propagate ls s/c k) 
+  (cond
+   ((null? cs) (k s/c)) ;;return state out
+   (((car ls) s/c k) -> (lambda (pair) ((cdr pair) (car pair))))
+   (else (p (cdr ls) s/c k))))
 
-(define add-content
-  (lambda (var info state)
-    (let ((cell (walk var state)))
+
+(define (pluso a b c)
+  (lambda (s/c k)
+    (let ((a (walk a s/c)) (b (walk b s/c)) (c (walk c s/c)))
       (cond
-       ((dummy? info) state)
-       ((dummy? (hash-ref cell 'value))
-        (hash-set cell 'value info)
-        ;;propagate here
-        )
-       (else (if (eqv? (hash-ref cell 'value) info)
-                 state
-                 #f))))))
+       ;;return #f with no change to state
+       ((or (dummy? a-value) (dummy? b-value)) #f)
+       ((and (not (dummy? a-value)) (not (dummy? b-value)) (not (dummy? c-value)))
+        #f) ;; need to check consistency here
+       (else `(,(hash-set c-value (+ a b)) .
+               ,(lambda (s/c)
+                  (propagate c-constraints s/c
+                    (lambda (s/c)
+                      (propagate b-constraints s/c
+                        (lambda (s/c)
+                          (propagate a-constraints s/c k))))))))))))
 
-(define new-neighbor
-  (lambda (cell neighbor state)
-    (let )))
+|#
+#|
+
+pluso a b c
+pluso d e c
+== a d
+=/= d e ;; should fail here?
+== a 5
+== e 6  ;; should definitely at least fail here 
 
 |#
