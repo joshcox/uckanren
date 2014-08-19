@@ -41,10 +41,11 @@
 (define (make-state u-f cells)
   (hasheqv 'u-f u-f
            'cells cells))
-(define (empty-cell) (hasheqv 'value 'dummy 'constraints '()))
+(define (empty-cell) (hasheqv 'type 'cell 'value 'dummy 'constraints '()))
 (define (empty-cells) (hasheqv))
 (define (empty-state)
   `(,(make-state (make-initial-u-f 256) (empty-cells)) . 0))
+(define (cell? c) (and (hash? c) (eqv? (hash-ref c 'type #f) 'cell)))
 
 ;;accessors
 (define (get-u-f s)
@@ -73,20 +74,22 @@
    ((not (var? v)) v)
    ((let ((root (find (get-u-f s) (var-name v))))
       (let ((cell (get-cell root s)))
-        (if cell (get-cell-value cell) (var root))))))) ;;return cell or root
+        (if cell cell (var root))))))) ;;return cell or root
 
 ;;unification
 (define (unify u^ v^ s)
   (let ((u (walk u^ s))
         (v (walk v^ s)))
-    (cond
-     ((eqv? u v) s) ;;possible *not* vars
-     ((var? u) (ext-s u v s))
-     ((var? v) (ext-s v u s))
-     ((and (pair? u) (pair? v))
-      (let ((s (unify (car u) (car v) s)))
-        (and s (unify (cdr u) (cdr v) s))))
-     (else (and (eqv? u v) s)))))
+    (let ((u (if (cell? u) (get-cell-value u) u))
+          (v (if (cell? v) (get-cell-value v) v)))
+      (cond
+       ((eqv? u v) s) ;;possible *not* vars
+       ((var? u) (ext-s u v s))
+       ((var? v) (ext-s v u s))
+       ((and (pair? u) (pair? v))
+        (let ((s (unify (car u) (car v) s)))
+          (and s (unify (cdr u) (cdr v) s))))
+       (else (and (eqv? u v) s)))))) 
 
 (define (ext-s x v s)
   (cond
