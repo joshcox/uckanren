@@ -59,6 +59,18 @@
 (define (get-cell-constraints c)
   (hash-ref c 'constraints))
 
+(define (add-constraint-to-cell constraint cell s)
+  (let ((cell (get-cell cell s)))
+    (make-state (get-u-f s)
+      (hash-set (get-cells s) cell
+        (hash-set cell 'constraints (cons constraint (hash-ref cell 'constraints)))))))
+
+(define (merge-cells c1 c2 s)
+  (let ((c1 (get-cell c1 s))
+        (c2 (get-cell c2 s)))
+    (hash-set c1 'constraints
+      (append (hash-ref c2 'constraints) (hash-ref c1 'constraints)))))
+
 ;;microKanren variables
 (define (var v) (box v))
 (define (var-name v) (unbox v))
@@ -93,7 +105,10 @@
 
 (define (ext-s x v s)
   (cond
-   ((var? v) (make-state (union (get-u-f s) (var-name x) (var-name v))))
+   ((var? v)
+    (let ((s^ (make-state (union (get-u-f s) (var-name x) (var-name v))
+                          (hash-set (get-cells s) x (merge-cells x v s)))));;ordering?
+      (propagate (get-cell-constraints (get-cell x s^)) s^ (lambda (x) x)))) 
    ((occurs? x v s) #f)
    (else
     (let ((cell (hash-set (empty-cell) 'value v)))
@@ -107,31 +122,43 @@
      (else #f))))
 ;;end unification
 
-#|
-(define (propagate ls s/c k) 
-  (cond
-   ((null? cs) (k s/c)) ;;return state out
-   (((car ls) s/c k) -> (lambda (pair) ((cdr pair) (car pair))))
-   (else (p (cdr ls) s/c k))))
 
+;; begin propagation
+
+(define propagate
+  (lambda (ls s k)
+    (cond
+     ((null? ls) (k s))
+     (else ((car ls) (cdr ls) s k))))) ;; microKanren failure
 
 (define (pluso a b c)
-  (lambda (s/c k)
-    (let ((a (walk a s/c)) (b (walk b s/c)) (c (walk c s/c)))
-      (cond
-       ;;return #f with no change to state
-       ((or (dummy? a-value) (dummy? b-value)) #f)
-       ((and (not (dummy? a-value)) (not (dummy? b-value)) (not (dummy? c-value)))
-        #f) ;; need to check consistency here
-       (else `(,(hash-set c-value (+ a b)) .
-               ,(lambda (s/c)
-                  (propagate c-constraints s/c
-                    (lambda (s/c)
-                      (propagate b-constraints s/c
-                        (lambda (s/c)
-                          (propagate a-constraints s/c k))))))))))))
+  (lambda (s/c)
+    (let ((s^ (fold-right (lambda (x s) (add-constraint-to-cell (pluso-fd a b c) x s))
+                          (car s/c) (list a b c))))
+      (let ((p (propagate (get-cell-constraints (get-cell a (car s/c)))
+                          s/c
+                          (lambda (x) x))))
+        (if p p '())))))
 
-|#
+(define (pluso-fd a b c)
+  (lambda (ls s k)
+    (cond
+     ((consistent) ;;easy - check if (eqv? (+ a-val b-val) c-val)
+      (propagate ls s
+          (lambda (s)
+            (propagate (get-cell-constraints (get-cell a s)) s
+              (lambda (s)
+                (propagate (get-cell-constraints (get-cell b s)) s
+                  (lambda (s)
+                    (propagate (get-cell-constraints (get-cell a s)) s k))))))))
+     ((new-information) ;;how to work this backwards? (pluso 5 b 11)
+      (propagate (get-cell-constraints (get-cell a s)) s
+         (lambda (s)
+           (propagate (get-cell-constraints (get-cell b s)) s
+             (lambda (s)
+               (propagate (get-cell-constraints (get-cell a s)) s (lambda (x) x)))))))
+     (else #f))))
+
 #|
 
 pluso a b c

@@ -62,11 +62,12 @@
 
 (define (walk* v s)
   (let ((v (walk v s)))
-    (cond
-      ((var? v) v)
-      ((pair? v) (cons (walk* (car v) s)
-                       (walk* (cdr v) s)))
-      (else  v))))
+    (let ((v (if (cell? v) (get-cell-value v) v)))
+      (cond
+       ((var? v) v)
+       ((pair? v) (cons (walk* (car v) s)
+                        (walk* (cdr v) s)))
+       (else  v)))))
 
 (define (reify-s v s)
   (let ((v (walk v s)))
