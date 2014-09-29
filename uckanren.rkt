@@ -2,19 +2,24 @@
 (provide (all-defined-out))
 (define (var n) (box n))
 (define (var? n) (box? n))
+(define (bump n) (var (add1 (unvar n))))
 (define (var=? n1 n2) (eqv? (unbox n1) (unbox n2)))
 
 ;;extend the state with mapping from x -> cell
-(define (ext-s x v s) (cons (cons x `('fresh '() '())) s))
+;;auto-bump for cleaner code later
+(define (ext-s s)
+  (pmatch s
+    (`() (let ((v (var 0))) `((,v . `(v '() '()))))))
+    (`((,v . ,_) . ,_) (let ((v (bump v))) `((,v . `(v '() '())) . s))))
+
 (define cs-cell caddr)
 (define dom-cell cadr)
 (define val-cell car)
 
 (define (call/fresh f)
-  (lambda (s/c)
-    (let ((c (cdr s/c)))
-      (let ((v (var c)))
-        ((f v) `(,(ext-s v (car s/c)) . ,(+ 1 c)))))))
+  (lambda (s)
+    (let ((s (ext-s s)))
+      ((f (car (car s))) s))))
 
 (define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
 
@@ -32,7 +37,7 @@
    ((null? $) `())
    (else ($-append (g (car $)) ($-append-map g (cdr $))))))
 
-(define (call/empty-state g) (g (cons '() 0)))
+(define (call/empty-state g) (g '()))
 
 ;; (define (== u v)
 ;;   (lambda (s/c)
