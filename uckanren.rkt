@@ -8,10 +8,8 @@
 ;;extend the state with mapping from x -> cell
 ;;auto-bump for cleaner code later
 (define (ext-s s)
-  (pmatch s
-    (`() (let ((v (var 0))) `((,v . `(v '() '()))))))
-    (`((,v . ,_) . ,_) (let ((v (bump v))) `((,v . `(v '() '())) . s))))
-
+  (let ((v (if (null? s) (var 0) (bump v))))
+    `((,v . `(v '() '())) . s)))
 (define cs-cell caddr)
 (define dom-cell cadr)
 (define val-cell car)
