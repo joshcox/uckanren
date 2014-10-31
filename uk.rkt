@@ -8,15 +8,11 @@
 (define (var=? v1 v2) (and (var? v1) (var? v2) (eqv? (unvar v1) (unvar v2))))
 
 (define mzero '())
-(define (unit s) (if s (cons s mzero) '()))
+(define (unit s) (if s (cons s mzero) '())) ;;use unit to lift values to stream`
 
 (define (walk u s)
   (let ((pr (and (var? u) (assoc u s var=?))))
-    (if pr
-        (if (var=? u (cdr pr))
-            u
-            (walk (cdr pr) s))
-        u)))
+    (if pr (if (var=? u (cdr pr)) u (walk (cdr pr) s)) u)))
 
 (define bump
   (lambda (s)
@@ -56,19 +52,7 @@
         (and s (unify (cdr u) (cdr v) s))))
      (else #f))))
 
-
-
-;; (define (== u v)
-;;   (lambda (s/c)
-;;     (let ((s (unify u v (car s/c))))
-;;       (if s (list (cons s (cdr s/c))) `()))))
-
-(define (== u v) (lambda (s) (unit (unify u v s))))
-
-;; (define (call/fresh f)
-;;   (lambda (s/c)
-;;     (let ((c (cdr s/c)))
-;;       ((f (var c)) (cons (car s/c) (+ 1 c))))))
+(define (== u v) (lambda (s) (unit (unify u v s)))) 
 
 (define (call/fresh f)
   (lambda (s)
