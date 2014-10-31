@@ -6,6 +6,13 @@
     (lambda (list)
       (if (member item list) #t #f))))
 
+(define member*?
+  (lambda (item*)
+    (lambda (list)
+      (cond
+       ((null? item*) #t)
+       (else (and ((member? (car item*)) list) ((member*? (cdr item*)) list)))))))
+
 (define miniKanren-Tests
   (test-suite
    "mK Tests"
@@ -14,11 +21,31 @@
 
     (test-pred
      "Appendo1"
-     (member? '(1 2 3 4 5)) (run* (q) (appendo '(1 2 3) '(4 5) q))))
-   ))
+     (member? '(1 2 3 4 5)) (run* (q) (appendo '(1 2 3) '(4 5) q)))
 
+    (test-pred
+     "Appendo can go backwards 1"
+     (member? '(4 5))
+     (run* (q) (appendo '(1 2 3) q '(1 2 3 4 5))))
 
+    (test-pred
+     "Appendo can go backward 2"
+     (member? '(1 2 3))
+     (run* (q) (appendo q '(4 5) '(1 2 3 4 5))))
 
+    (let ((a (run 5 (q) (fresh (a b c) (== q `(,a ,b ,c)) (appendo a b c)))))
+      (test-pred
+       "Appendo can generate lists"
+       
+       (member*? '((() _.0 _.0)
+          ((_.0) _.1 (_.0 . _.1))
+          ((_.0 _.1) _.2 (_.0 _.1 . _.2))
+          ((_.0 _.1 _.2) _.3 (_.0 _.1 _.2 . _.3))
+          ((_.0 _.1 _.2 _.3) _.4 (_.0 _.1 _.2 _.3 . _.4))))
+       a)))))
+
+(run-tests miniKanren-Tests)
+(define (r) (run-tests miniKanren-Tests))
 
 ;; (define state-tests
 ;;   (test-suite
