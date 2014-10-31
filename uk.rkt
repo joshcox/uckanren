@@ -1,5 +1,5 @@
 #lang racket
-(require C311/trace)
+(require C311/pmatch C311/trace)
 (provide (all-defined-out))
 
 (define (var v) (box v))
@@ -7,20 +7,36 @@
 (define (var? v) (box? v))
 (define (var=? v1 v2) (and (var? v1) (var? v2) (eqv? (unvar v1) (unvar v2))))
 
-;;not nearly what we want or need
-;;(define (ext-s x v s) (cons (cons x v) s))
+(define mzero '())
+(define (unit s) (if s (cons s mzero) '()))
 
 (define (walk u s)
   (let ((pr (and (var? u) (assoc u s var=?))))
-    (if pr (walk (cdr pr) s) u)))
+    (if pr
+        (if (var=? u (cdr pr))
+            u
+            (walk (cdr pr) s))
+        u)))
+
+(define bump
+  (lambda (s)
+    (cond
+     ((null? s) (let ((v (var 0))) (cons (cons v v) s)))
+     (else (let ((v (var (add1 (unvar (caar s)))))) (cons (cons v v) s))))))
+
+(define update
+  (lambda (x v s)
+    (cond
+     ((null? s) s)
+     ((var=? x (caar s)) (cons (cons (caar s) v) (cdr s)))
+     (else (cons (car s) (update x v (cdr s)))))))
 
 (define ext-s
   (lambda (x v s)
     (cond
-     ((var? v) (cons (cons x v) s)) ; update var x with var v (cons (cons x v) s)
+     ((var? v) (update x v s))       ; update var x with var v (cons (cons x v) s)
      ((occurs? x v s) #f) ; fail out if x occurs in v (only matters if v is list)
-     (else (cons (cons x v) s))
-     )))
+     (else (update x v s)))))
 
 (define occurs?
   (lambda (x v s)
@@ -40,15 +56,23 @@
         (and s (unify (cdr u) (cdr v) s))))
      (else #f))))
 
-(define (== u v)
-  (lambda (s/c)
-    (let ((s (unify u v (car s/c))))
-      (if s (list (cons s (cdr s/c))) `()))))
+
+
+;; (define (== u v)
+;;   (lambda (s/c)
+;;     (let ((s (unify u v (car s/c))))
+;;       (if s (list (cons s (cdr s/c))) `()))))
+
+(define (== u v) (lambda (s) (unit (unify u v s))))
+
+;; (define (call/fresh f)
+;;   (lambda (s/c)
+;;     (let ((c (cdr s/c)))
+;;       ((f (var c)) (cons (car s/c) (+ 1 c))))))
 
 (define (call/fresh f)
-  (lambda (s/c)
-    (let ((c (cdr s/c)))
-      ((f (var c)) (cons (car s/c) (+ 1 c))))))
+  (lambda (s)
+    (let ((s (bump s))) ((f (caar s)) s))))
 
 (define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
 
@@ -67,6 +91,6 @@
    (else ($-append (g (car $)) ($-append-map g (cdr $))))))
 
 (define (call/empty-state g) (g (empty-state)))
-(define (empty-state) `(() . 0))
+(define (empty-state) '())
 
 

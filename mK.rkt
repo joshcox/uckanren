@@ -36,8 +36,8 @@
      (inverse-eta-delay
       (disj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
 
-(define (reify-var0 s/c)
-  (let ((v (walk* (var 0) (car s/c))))
+(define (reify-var0 s)
+  (let ((v (walk* (var 0) s)))
     (walk* v (reify-s v '()))))
 
 (define (reify-s v s)
