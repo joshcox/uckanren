@@ -4,6 +4,15 @@
 
 ;; test programs
 
+;; (define appendo
+;;   (lambda (l s o)
+;;     (conde
+;;      [(== l '()) (== o s)]
+;;      [(fresh (a b res)
+;;              (== l `(,a . ,b))
+;;              (== o `(,a . ,res))
+;;              (appendo b s res))])))
+
 (define listo
   (lambda (x)
     (conde
@@ -36,9 +45,9 @@
   (lambda (ls o)
     (conde
      [(== ls '()) (== o (build-num 0))]
-     [(fresh (a res)
-             (cdro ls a)
-             (lengtho a res)
+     [(fresh (a d res)
+             (== `(,a . ,d) ls)
+             (lengtho d res)
              (pluso '(1) res o))])))
 
 (define one-itemo
@@ -50,15 +59,15 @@
              (== o `((,x . ,a) . ,res))
              (one-itemo x b res))])))
 
-(define assqo
-  (lambda (x ls o)
-    (conde
-     [(== ls '()) fail]
-     [(fresh (a b)
-             (caro ls a)
-             (caro a b)
-             (== b x)
-             (== o a))]
-     [(fresh (a)
-             (cdro ls a)
-             (assqo x a o))])))
+;; (define assqo
+;;   (lambda (x ls o)
+;;     (conde
+;;      [(== ls '()) fail]
+;;      [(fresh (a d aa da)
+;;              (== `(,a . ,d) ls)
+;;              (== `(,aa . ,da) a)
+;;              (== aa x)
+;;              (== o a))]
+;;      [(fresh (a d)
+;;              (== `(,a . ,d) ls)
+;;              (assqo x d o))])))

@@ -10,27 +10,32 @@
 (define mzero '())
 (define (unit s) (if s (cons s mzero) '())) ;;use unit to lift values to stream`
 
+;; walk needs to go one step further to pull out the val in meaning of u
+;; (car (cdr ps)) - get out value
 (define (walk u s)
   (let ((pr (and (var? u) (assoc u s var=?))))
-    (if pr (if (var=? u (cdr pr)) u (walk (cdr pr) s)) u)))
+    (if pr (if (var=? u (car (cdr pr))) u (walk (car (cdr pr)) s)) u)))
 
+;; var meaning is going to consist of pair `(val domain constraint-store)
+(define (new-var v) (list v '() '()))
 (define bump
   (lambda (s)
     (cond
-     ((null? s) (let ((v (var 0))) (cons (cons v v) s)))
-     (else (let ((v (var (add1 (unvar (caar s)))))) (cons (cons v v) s))))))
+     ((null? s) (let ((v (var 0))) (cons (cons v (new-var v)) s)))
+     (else (let ((v (var (add1 (unvar (caar s)))))) (cons (cons v (new-var v)) s))))))
 
+;; have to place v in val position in meaning of x
 (define update
   (lambda (x v s)
     (cond
      ((null? s) s)
-     ((var=? x (caar s)) (cons (cons (caar s) v) (cdr s)))
+     ((var=? x (caar s)) (cons (cons (caar s) (cons v (cdr (cdr (car s))))) (cdr s)))
      (else (cons (car s) (update x v (cdr s)))))))
 
 (define ext-s
   (lambda (x v s)
     (cond
-     ((var? v) (update x v s))       ; update var x with var v (cons (cons x v) s)
+     ((var? v) (update x v s)) ; update var x with var v (cons (cons x v) s)
      ((occurs? x v s) #f) ; fail out if x occurs in v (only matters if v is list)
      (else (update x v s)))))
 

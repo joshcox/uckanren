@@ -1,5 +1,5 @@
 #lang racket/base
-(require rackunit rackunit/text-ui "uk.rkt" "mK.rkt" "test-programs.rkt")
+(require rackunit rackunit/text-ui "uk.rkt" "mK.rkt" "test-programs.rkt" "numbers.rkt")
 
 (define member?
   (lambda (item)
@@ -42,7 +42,15 @@
           ((_.0 _.1) _.2 (_.0 _.1 . _.2))
           ((_.0 _.1 _.2) _.3 (_.0 _.1 _.2 . _.3))
           ((_.0 _.1 _.2 _.3) _.4 (_.0 _.1 _.2 _.3 . _.4))))
-       a)))))
+       a)))
+   
+   ;; (test-suite
+   ;;  "Reverseo")
+
+   ;; (test-suite
+   ;;  "")
+   
+   ))
 
 (run-tests miniKanren-Tests)
 (define (r) (run-tests miniKanren-Tests))
