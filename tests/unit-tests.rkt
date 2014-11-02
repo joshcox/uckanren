@@ -1,5 +1,5 @@
 #lang racket/base
-(require rackunit rackunit/text-ui "uk.rkt" "mK.rkt" "test-programs.rkt" "numbers.rkt")
+(require rackunit rackunit/text-ui "../uk.rkt" "../mK.rkt" "test-programs.rkt" "../numbers.rkt")
 
 (define member?
   (lambda (item)

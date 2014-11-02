@@ -1,5 +1,5 @@
 #lang racket
-(require "uk.rkt" "mK.rkt" "numbers.rkt")
+(require "../uk.rkt" "../mK.rkt" "../numbers.rkt")
 (provide (all-defined-out))
 
 ;; test programs
