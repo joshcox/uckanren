@@ -1,12 +1,25 @@
 #lang racket
 (require "uk.rkt")
-(provide (all-defined-out))
+(provide (all-from-out "uk.rkt") (all-defined-out))
 
 (define (walk* v s)
   (let ((v (walk v s)))
     (cond
      ((var? v) v)
      ((pair? v) (cons (walk* (car v) s) (walk* (cdr v) s)))
+     (else v))))
+
+;;NOTE: This is annoying. Have to retain old versions of walk* and walk
+;; to be able to reify things. This needs to go away. It's a badness.
+(define (orig-walk u s)
+  (let ((pr (and (var? u) (assoc u s var=?))))
+    (if pr (if (var=? u (cdr pr)) u (walk (cdr pr) s)) u)))
+
+(define (walk** v s)
+  (let ((v (orig-walk v s)))
+    (cond
+     ((var? v) v)
+     ((pair? v) (cons (walk** (car v) s) (walk** (cdr v) s)))
      (else v))))
 
 (define-syntax inverse-eta-delay
@@ -38,10 +51,10 @@
 
 (define (reify-var0 s)
   (let ((v (walk* (var 0) s)))
-    (walk* v (reify-s v '()))))
+    (walk** v (reify-s v '()))))
 
 (define (reify-s v s)
-  (let ((v (walk v s)))
+  (let ((v (orig-walk v s)))
     (cond
      ((var? v)
       (let ((name (reify-name (length s))))

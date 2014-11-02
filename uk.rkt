@@ -25,6 +25,10 @@
      (else (let ((v (var (add1 (unvar (caar s)))))) (cons (cons v (new-var v)) s))))))
 
 ;; have to place v in val position in meaning of x
+;; car s => (var (val dom cs))
+;; caar s => var
+;; cdr car s => (val dom cs)
+;; car cdr car => val
 (define update
   (lambda (x v s)
     (cond

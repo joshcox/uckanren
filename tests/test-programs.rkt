@@ -1,6 +1,6 @@
 #lang racket
 (require "../uk.rkt" "../mK.rkt" "../numbers.rkt")
-(provide (all-defined-out))
+(provide (all-from-out "../uk.rkt" "../mK.rkt" "../numbers.rkt") (all-defined-out))
 
 ;; test programs
 
