@@ -1,5 +1,6 @@
 #lang racket/base
 (require rackunit rackunit/text-ui "../uk.rkt" "../mK.rkt" "test-programs.rkt" "../numbers.rkt")
+(provide (all-defined-out))
 
 (define member?
   (lambda (item)
@@ -44,12 +45,41 @@
           ((_.0 _.1 _.2 _.3) _.4 (_.0 _.1 _.2 _.3 . _.4))))
        a)))
    
-   ;; (test-suite
-   ;;  "Reverseo")
+   (test-suite
+    "Reverseo"
 
-   ;; (test-suite
-   ;;  "")
-   
+    (test-pred
+     "Find the reverse of a list"
+     (member? '(5 4 3 2 1)) (run 1 (q) (reverseo '(1 2 3 4 5) q)))
+
+    (test-pred
+     "Find the list of a reverse"
+     (member? '(5 4 3 2 1)) (run 1 (q) (reverseo q '(1 2 3 4 5))))
+
+    (test-pred
+     "Generate reversed lists"
+     (member*? '(() (_.0) (_.0 _.1) (_.0 _.1 _.2) (_.0 _.1 _.2 _.3)))
+     (run 5 (q) (fresh (a) (reverseo a q))))
+    )
+
+   (test-suite
+    "Factorial"
+
+    (test-pred
+     "What is Fact 5?"
+     (member? (build-num 120))
+     (run* (q) (facto (build-num 5) q)))
+
+    (test-pred
+     "What yields 120 (and not everything else in between?)"
+     (member? (build-num 5))
+     (run 1 (q) (facto q (build-num 120))))
+
+    ;; (test-pred
+    ;;  "What yields 120 (and everything else in between?)"
+    ;;  (member? (build-num 5))
+    ;;  (run* (q) (facto q (build-num 120))))
+    )
    ))
 
 (run-tests miniKanren-Tests)
