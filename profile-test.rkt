@@ -4,9 +4,9 @@
 
 ;; profiler section
 
-(define profile
-  (lambda (th)
-    (visualize-futures th)))
+;; (define profile
+;;   (lambda (th)
+;;     (visualize-futures th)))
 
 (define-syntax run/time
   (syntax-rules ()

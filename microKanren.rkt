@@ -46,8 +46,14 @@
 
 (define (pdisj g1 g2)
   (lambda (s/c)
-    (let ((g2 (future (lambda () (g2 s/c)))))
-      ($-append (g1 s/c) (touch g2)))))
+    (let ((ch (make-channel)))
+      (let ((t (thread (lambda () (channel-put ch (g2 s/c))))))
+        (((curry $-append) (g1 s/c)) (sync ch))))))
+
+;; (define (pdisj g1 g2)
+;;   (lambda (s/c)
+;;     (let ((g2 (thread (lambda () (g2 s/c)))))
+;;       ($-append (g1 s/c) (touch g2)))))
 
 (define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
 (define (conj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
