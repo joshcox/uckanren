@@ -88,18 +88,7 @@
 (define (reify-name n)
   (string->symbol
     (string-append "_." (number->string n))))
-(define (pull $) (if (procedure? $) (pull ($)) $))
-(define (take n)
-  (lambda ($)
-    (cond
-      ((zero? n) '())
-      (else
-       (let (($ (pull $)))
-         (cond
-           ((null? $) '())
-           (else
-            (cons (car $)
-             ((take (- n 1)) (cdr $))))))))))
+
 (define-syntax run
   (syntax-rules ()
     ((_ n (q) g0 g ...)

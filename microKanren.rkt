@@ -1,5 +1,5 @@
 #lang racket
-(require C311/trace)
+(require C311/trace C311/pmatch)
 (require racket/place)
 (require racket/async-channel)
 (provide (all-defined-out))
@@ -93,3 +93,32 @@
              (cons `(,ch . ,t) ($-map g (cdr $))))))))
 
 (define (call/empty-state g) (g (cons '() 0)))
+
+(define (pull $) (if (procedure? $) (pull ($)) $))
+
+(define (take n)
+  (lambda ($)
+    (cond
+      ((zero? n) '())
+      (else
+       (let (($ (pull $)))
+         (cond
+           ((null? $) '())
+           (else
+            (cons (car $)
+             ((take (- n 1)) (cdr $))))))))))
+
+(define mk
+  (lambda (exp env)
+    (pmatch exp
+      (`,x (guard (symbol? x)) (env x))
+      (`,x (guard (or (number? x) (boolean? x))) x)
+      (`(quote ,x) x)
+      (`(conj ,g1 ,g2) (conj (mk g1 env) (mk g2 env))) 
+      (`(disj ,g1 ,g2) (disj (mk g1 env) (mk g2 env)))
+      (`(call/fresh ,f) (call/fresh (mk f env)))
+      (`(call/empty-state ,g) (call/empty-state (mk g env)))
+      (`(run ,num (,x) ,e) (guard (number? num))
+       ((take num) (call/empty-state (mk `(call/fresh (lambda (,x) ,e)) env))))
+      (`(== ,x ,y) (== (mk x env) (mk y env)))
+      (`(lambda (,x) ,e) (lambda (a) (mk e (lambda (y) (if (eqv? x y) a (env y)))))))))
