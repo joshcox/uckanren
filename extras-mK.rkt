@@ -34,14 +34,21 @@
 (define-syntax inverse-eta-delay
   (syntax-rules ()
     ((_ g) (lambda (s/c) (lambda () (g s/c))))))
+
 (define-syntax conj+
   (syntax-rules ()
     ((_ g) g)
     ((_ g0 g ...) (conj g0 (conj+ g ...)))))
+
 (define-syntax disj+
   (syntax-rules ()
     ((_ g) g)
     ((_ g0 g ...) (disj g0 (disj+ g ...)))))
+
+(define-syntax pconj+
+  (syntax-rules ()
+    ((_ g) g)
+    ((_ g0 g ...) (pconj g0 (pconj+ g ...)))))
 
 (define-syntax pdisj+
   (syntax-rules ()
@@ -59,7 +66,7 @@
   (syntax-rules ()
     ((_ (g0 g ...) (g0* g* ...) ...)
      (inverse-eta-delay
-      (pdisj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
+      (pdisj+ (pconj+ g0 g ...) (pconj+ g0* g* ...) ...)))))
 
 (define-syntax conde
   (syntax-rules ()

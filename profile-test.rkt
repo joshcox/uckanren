@@ -1,5 +1,6 @@
 #lang racket
-(require racket/future future-visualizer "test-programs.rkt")
+;; (require racket/future future-visualizer)
+(require "test-programs.rkt")
 (provide (all-defined-out) (all-from-out "test-programs.rkt"))
 
 ;; profiler section
