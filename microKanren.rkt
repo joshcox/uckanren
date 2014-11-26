@@ -1,6 +1,7 @@
 #lang racket
 (require C311/trace)
 (require racket/place)
+(require racket/async-channel)
 (provide (all-defined-out))
 
 (define (var n) n)
@@ -48,8 +49,8 @@
 
 (define (pdisj g1 g2)
   (lambda (s/c)
-    (let ((ch (make-channel)))
-      (let ((t (thread (lambda () (channel-put ch (g2 s/c))))))
+    (let ((ch (make-async-channel)))
+      (let ((t (thread (lambda () (async-channel-put ch (g2 s/c))))))
         (((curry $-append) (g1 s/c)) (sync ch))))))
 
 ;; (define (pdisj g1 g2)
@@ -57,7 +58,7 @@
 ;;     (let ((g2 (thread (lambda () (g2 s/c)))))
 ;;       ($-append (g1 s/c) (touch g2)))))
 
-(define (pconj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
+(define (pconj g1 g2) (lambda (s/c) (p$-append-map g2 (g1 s/c))))
 
 (define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
 (define (conj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
@@ -73,5 +74,22 @@
     ((procedure? $) (lambda () ($-append-map g ($))))
     ((null? $) `())
     (else ($-append (g (car $)) ($-append-map g (cdr $))))))
+
+(define (p$-append-map g $)
+  (let (($ ($-map g $)))
+    (let l (($ $))
+      (cond
+       ((procedure? $) $)
+       ((null? $) `())
+       (else (let ((s (sync (car (car $)))))
+               ($-append s (l (cdr $)))))))))
+
+(define ($-map g $)
+  (cond
+   ((procedure? $) (lambda () (p$-append-map g ($))))
+   ((null? $) `())
+   (else (let ((ch (make-channel)))
+           (let ((t (thread (lambda () (channel-put ch (g (car $)))))))
+             (cons `(,ch . ,t) ($-map g (cdr $))))))))
 
 (define (call/empty-state g) (g (cons '() 0)))

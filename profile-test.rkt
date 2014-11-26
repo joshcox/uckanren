@@ -29,7 +29,7 @@
 
 (define (run-tests)
   (run/stats*
-   (run 3 (q) (call/fresh (lambda (a) (conj (== q a) (pdisj (== a 'a) (== a 'b))))))
+   (run 3 (q) (call/fresh (lambda (a) (pconj (== q a) (pdisj (== a 'a) (== a 'b))))))
    (run 3 (q) (call/fresh (lambda (a) (conj (== q a) (disj (== a 'a) (== a 'b))))))
 
    (run 1 (q) (reverseo als q))
