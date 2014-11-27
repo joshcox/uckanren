@@ -12,7 +12,7 @@
 
 (define-syntax run/time
   (syntax-rules ()
-    ((_ th) (time (th)))))
+    ((_ th) (time (displayln (th))))))
 
 (define-syntax run/stats*
   (syntax-rules ()
@@ -35,6 +35,41 @@
 
    (run 1 (q) (reverseo als q))
    (run 1 (q) (preverseo als q))
+
+   
+   (mk `(letrec ((appendo
+                  (lambda (l s o)
+                    (disj
+                     (conj (== l '()) (== o s))
+                     (call/fresh
+                      (lambda (a)
+                        (call/fresh
+                         (lambda (b)
+                           (call/fresh
+                            (lambda (res)
+                              (conj (== l (cons a b))       ;;`(,a . ,b) 
+                                    (conj (== o (cons a res)) ;; `(,a . ,res)
+                                          (lambda (s/c)
+                                            (lambda ()
+                                              ((appendo b s res) s/c)))))))))))))))
+          (letrec ((reverseo
+                    (lambda (ls o)
+                      (disj
+                       (conj (== ls '()) (== o ls))
+                       (call/fresh
+                        (lambda (a)
+                          (call/fresh
+                           (lambda (b)
+                             (call/fresh
+                              (lambda (res)
+                                (conj (== (cons a b) ls) ;; `(,a . ,b)
+                                      (conj  (lambda (s/c)
+                                               (lambda ()
+                                                 ((reverseo b res) s/c)))
+                                             (lambda (s/c)
+                                               (lambda ()
+                                                 ((appendo res (cons a '()) o) s/c)))))))))))))))
+            (run 1 (q) (reverseo (quote ,als) q)))) '())
    )
 
   )

@@ -108,17 +108,97 @@
             (cons (car $)
              ((take (- n 1)) (cdr $))))))))))
 
+(define (walk* v s)
+  (let ((v (walk v s)))
+    (cond
+      ((var? v) v)
+      ((pair? v) (cons (walk* (car v) s) (walk* (cdr v) s)))
+      (else v))))
+
+(define (reify-var0 s/c)
+  (let ((v (walk* (var 0) (car s/c))))
+    (walk* v (reify-s v '()))))
+
+(define (reify-s v s)
+  (let ((v (walk v s)))
+    (cond
+      ((var? v)
+       (let ((name (reify-name (length s))))
+         (cons (cons v name) s)))
+      ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
+      (else s))))
+
+(define (reify-name n)
+  (string->symbol
+    (string-append "_." (number->string n))))
+
+;; (define program
+;;   (lambda (prog env)
+;;     ))
+
+(define ext-rec-env
+  (lambda (x e env)
+    `((,x rec . ,e) . ,env)))
+
 (define mk
   (lambda (exp env)
     (pmatch exp
-      (`,x (guard (symbol? x)) (env x))
+      (`,x (guard (symbol? x))
+           (let ((val (cdr (assq x env))))
+             (pmatch val
+               (`(var . ,x) x)
+               (`(rec . ,e) (mk e env)))))
       (`,x (guard (or (number? x) (boolean? x))) x)
+      (`(add1 ,n) (add1 (mk n env)))
+      (`(plus ,n1 ,n2) (+ (mk n1 env) (mk n2 env)))
+      (`(zero? ,n) (zero? (mk n env)))
+      (`(* ,n1 ,n2) (* (mk n1 env) (mk n2 env)))
+      (`(sub1 ,n) (sub1 (mk n env)))
+      (`(if ,t ,c ,a) (if (mk t env) (mk c env) (mk a env)))
       (`(quote ,x) x)
+      (`(quasiquote ,x) (mk x env))
+      (`((quote unquote) ,x) (mk x env))
+      (`(cons ,x ,y) (cons (mk x env) (mk y env)))
+      (`(car ,l) (car (mk l env)))
+      (`(cdr ,l) (cdr (mk l env)))
       (`(conj ,g1 ,g2) (conj (mk g1 env) (mk g2 env))) 
       (`(disj ,g1 ,g2) (disj (mk g1 env) (mk g2 env)))
       (`(call/fresh ,f) (call/fresh (mk f env)))
       (`(call/empty-state ,g) (call/empty-state (mk g env)))
       (`(run ,num (,x) ,e) (guard (number? num))
-       ((take num) (call/empty-state (mk `(call/fresh (lambda (,x) ,e)) env))))
+       (map reify-var0 ((take num) (call/empty-state (mk `(call/fresh (lambda (,x) ,e)) env)))))
       (`(== ,x ,y) (== (mk x env) (mk y env)))
-      (`(lambda (,x) ,e) (lambda (a) (mk e (lambda (y) (if (eqv? x y) a (env y)))))))))
+      (`(letrec ((,x ,e)) ,b) (mk b (ext-rec-env x e env)))
+      (`(lambda ,args ,e)
+       (let ((vars (for/list ((arg args)) (gensym))))
+         (lambda vars (mk e (append (map cons args (map (lambda (x) (cons 'var x)) vars)) env)))))
+      (`(,rat . ,rands) (apply (mk rat env) (map (lambda (x) (mk x env)) rands))))))
+
+(define mkRec
+  '(letrec ((appendo
+             (lambda (l s o)
+               (disj
+                (conj (== l '()) (== o s))
+                (call/fresh
+                 (lambda (a)
+                   (call/fresh
+                    (lambda (b)
+                      (call/fresh
+                       (lambda (res)
+                         (conj (== l (cons a b)) ;;`(,a . ,b) 
+                               (conj (== o (cons a res))   ;; `(,a . ,res)
+                                     (lambda (s/c) (lambda () ((appendo b s res) s/c)))))))))))))))
+     (letrec ((reverseo
+               (lambda (ls o)
+                 (disj
+                  (conj (== ls '()) (== o ls))
+                  (call/fresh
+                   (lambda (a)
+                     (call/fresh
+                      (lambda (b)
+                        (call/fresh
+                         (lambda (res)
+                           (conj (== (cons a b) ls) ;; `(,a . ,b)
+                            (conj  (lambda (s/c) (lambda () ((reverseo b res) s/c)))
+                                   (lambda (s/c) (lambda () ((appendo res (cons a '()) o) s/c)))))))))))))))
+       (run 1 (q) (reverseo '(a b c d e f g h i j) q)))))

@@ -22,12 +22,6 @@
 (define (call/project x f)
   (lambda (s/c)
     ((f (walk* x (car s/c))) s/c)))
-(define (walk* v s)
-  (let ((v (walk v s)))
-    (cond
-      ((var? v) v)
-      ((pair? v) (cons (walk* (car v) s) (walk* (cdr v) s)))
-      (else v))))
 
 
 ;; miniKanren
@@ -74,20 +68,7 @@
      (inverse-eta-delay
       (disj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
 
-(define (reify-var0 s/c)
-  (let ((v (walk* (var 0) (car s/c))))
-    (walk* v (reify-s v '()))))
-(define (reify-s v s)
-  (let ((v (walk v s)))
-    (cond
-      ((var? v)
-       (let ((name (reify-name (length s))))
-         (cons (cons v name) s)))
-      ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
-      (else s))))
-(define (reify-name n)
-  (string->symbol
-    (string-append "_." (number->string n))))
+
 
 (define-syntax run
   (syntax-rules ()
