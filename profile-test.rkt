@@ -27,6 +27,7 @@
 
 
 (define als (build-list 100 (lambda (x) 'a)))
+(define als2 (build-list 500 (lambda (x) 'a)))
 
 (define (run-tests)
   (run/stats*
@@ -37,7 +38,7 @@
    (run 1 (q) (preverseo als q))
 
    
-   (mk `(letrec ((appendo
+   (vof `(letrec ((appendo
                   (lambda (l s o)
                     (disj
                      (conj (== l '()) (== o s))
@@ -70,8 +71,38 @@
                                                (lambda ()
                                                  ((appendo res (cons a '()) o) s/c)))))))))))))))
             (run 1 (q) (reverseo (quote ,als) q)))) '())
-   )
 
-  )
-
-
+   (vof `(letrec ((appendo
+                  (lambda (l s o)
+                    (pdisj
+                     (conj (== l '()) (== o s))
+                     (call/fresh
+                      (lambda (a)
+                        (call/fresh
+                         (lambda (b)
+                           (call/fresh
+                            (lambda (res)
+                              (conj (== l (cons a b))       ;;`(,a . ,b) 
+                                    (conj (== o (cons a res)) ;; `(,a . ,res)
+                                          (lambda (s/c)
+                                            (lambda ()
+                                              ((appendo b s res) s/c)))))))))))))))
+          (letrec ((reverseo
+                    (lambda (ls o)
+                      (pdisj
+                       (conj (== ls '()) (== o ls))
+                       (call/fresh
+                        (lambda (a)
+                          (call/fresh
+                           (lambda (b)
+                             (call/fresh
+                              (lambda (res)
+                                (conj (== (cons a b) ls) ;; `(,a . ,b)
+                                      (conj  (lambda (s/c)
+                                               (lambda ()
+                                                 ((reverseo b res) s/c)))
+                                             (lambda (s/c)
+                                               (lambda ()
+                                                 ((appendo res (cons a '()) o) s/c)))))))))))))))
+            (run 1 (q) (reverseo (quote ,als) q)))) '())
+   ))

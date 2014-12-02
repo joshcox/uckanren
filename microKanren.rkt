@@ -41,27 +41,16 @@
     (let ((c (cdr s/c)))
       ((f (var c)) (cons (car s/c) (+ 1 c))))))
 
-;; (define (pdisj g1 g2)
-;;   (lambda (s/c)
-;;     (let-values (((pch1 pch2) (place-channel)))
-;;       (let ((p (place pch1 (let ((g (g2 s/c))) (place-channel-put pch1 g)))))
-;;         (((curry $-append) (g1 s/c)) (place-channel-get pch2))))))
+(define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
+(define (conj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
 
 (define (pdisj g1 g2)
   (lambda (s/c)
     (let ((ch (make-async-channel)))
       (let ((t (thread (lambda () (async-channel-put ch (g2 s/c))))))
-        (((curry $-append) (g1 s/c)) (sync ch))))))
+        (((curry $-append) (g1 s/c)) (let ((v (sync ch))) (kill-thread t) v))))))
 
-;; (define (pdisj g1 g2)
-;;   (lambda (s/c)
-;;     (let ((g2 (thread (lambda () (g2 s/c)))))
-;;       ($-append (g1 s/c) (touch g2)))))
-
-(define (pconj g1 g2) (lambda (s/c) (p$-append-map g2 (g1 s/c))))
-
-(define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
-(define (conj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
+(define pconj conj)
 
 (define ($-append $1 $2)
   (cond
@@ -74,23 +63,6 @@
     ((procedure? $) (lambda () ($-append-map g ($))))
     ((null? $) `())
     (else ($-append (g (car $)) ($-append-map g (cdr $))))))
-
-(define (p$-append-map g $)
-  (let (($ ($-map g $)))
-    (let l (($ $))
-      (cond
-       ((procedure? $) $)
-       ((null? $) `())
-       (else (let ((s (sync (car (car $)))))
-               ($-append s (l (cdr $)))))))))
-
-(define ($-map g $)
-  (cond
-   ((procedure? $) (lambda () (p$-append-map g ($))))
-   ((null? $) `())
-   (else (let ((ch (make-channel)))
-           (let ((t (thread (lambda () (channel-put ch (g (car $)))))))
-             (cons `(,ch . ,t) ($-map g (cdr $))))))))
 
 (define (call/empty-state g) (g (cons '() 0)))
 
@@ -132,73 +104,49 @@
   (string->symbol
     (string-append "_." (number->string n))))
 
-;; (define program
-;;   (lambda (prog env)
-;;     ))
+(define (ext-env tag x e env)
+  `((,tag ,x ,e) . ,env))
 
-(define ext-rec-env
-  (lambda (x e env)
-    `((,x rec . ,e) . ,env)))
+(define (apply-env x env)
+  (pmatch env
+    (`() (error 'unbound-variable))
+    (`((,tag ,y ,e) . ,env^) (if (eqv? y x) `(,tag ,y ,e) (apply-env x env^)))))
 
-(define mk
+(define vof
   (lambda (exp env)
     (pmatch exp
-      (`,x (guard (symbol? x))
-           (let ((val (cdr (assq x env))))
-             (pmatch val
-               (`(var . ,x) x)
-               (`(rec . ,e) (mk e env)))))
-      (`,x (guard (or (number? x) (boolean? x))) x)
-      (`(add1 ,n) (add1 (mk n env)))
-      (`(plus ,n1 ,n2) (+ (mk n1 env) (mk n2 env)))
-      (`(zero? ,n) (zero? (mk n env)))
-      (`(* ,n1 ,n2) (* (mk n1 env) (mk n2 env)))
-      (`(sub1 ,n) (sub1 (mk n env)))
-      (`(if ,t ,c ,a) (if (mk t env) (mk c env) (mk a env)))
-      (`(quote ,x) x)
-      (`(quasiquote ,x) (mk x env))
-      (`((quote unquote) ,x) (mk x env))
-      (`(cons ,x ,y) (cons (mk x env) (mk y env)))
-      (`(car ,l) (car (mk l env)))
-      (`(cdr ,l) (cdr (mk l env)))
-      (`(conj ,g1 ,g2) (conj (mk g1 env) (mk g2 env))) 
-      (`(disj ,g1 ,g2) (disj (mk g1 env) (mk g2 env)))
-      (`(call/fresh ,f) (call/fresh (mk f env)))
-      (`(call/empty-state ,g) (call/empty-state (mk g env)))
+      ;; microKanren
+      (`(conj ,g1 ,g2) (conj (vof g1 env) (vof g2 env))) 
+      (`(disj ,g1 ,g2) (disj (vof g1 env) (vof g2 env)))
+      (`(call/fresh ,f) (call/fresh (vof f env)))
+      (`(call/empty-state ,g) (call/empty-state (vof g env)))
       (`(run ,num (,x) ,e) (guard (number? num))
-       (map reify-var0 ((take num) (call/empty-state (mk `(call/fresh (lambda (,x) ,e)) env)))))
-      (`(== ,x ,y) (== (mk x env) (mk y env)))
-      (`(letrec ((,x ,e)) ,b) (mk b (ext-rec-env x e env)))
-      (`(lambda ,args ,e)
-       (let ((vars (for/list ((arg args)) (gensym))))
-         (lambda vars (mk e (append (map cons args (map (lambda (x) (cons 'var x)) vars)) env)))))
-      (`(,rat . ,rands) (apply (mk rat env) (map (lambda (x) (mk x env)) rands))))))
+       (map reify-var0 ((take num) (call/empty-state (vof `(call/fresh (lambda (,x) ,e)) env)))))
+      (`(== ,x ,y) (== (vof x env) (vof y env)))
 
-(define mkRec
-  '(letrec ((appendo
-             (lambda (l s o)
-               (disj
-                (conj (== l '()) (== o s))
-                (call/fresh
-                 (lambda (a)
-                   (call/fresh
-                    (lambda (b)
-                      (call/fresh
-                       (lambda (res)
-                         (conj (== l (cons a b)) ;;`(,a . ,b) 
-                               (conj (== o (cons a res))   ;; `(,a . ,res)
-                                     (lambda (s/c) (lambda () ((appendo b s res) s/c)))))))))))))))
-     (letrec ((reverseo
-               (lambda (ls o)
-                 (disj
-                  (conj (== ls '()) (== o ls))
-                  (call/fresh
-                   (lambda (a)
-                     (call/fresh
-                      (lambda (b)
-                        (call/fresh
-                         (lambda (res)
-                           (conj (== (cons a b) ls) ;; `(,a . ,b)
-                            (conj  (lambda (s/c) (lambda () ((reverseo b res) s/c)))
-                                   (lambda (s/c) (lambda () ((appendo res (cons a '()) o) s/c)))))))))))))))
-       (run 1 (q) (reverseo '(a b c d e f g h i j) q)))))
+      ;;parallel microKanren
+      (`(pdisj ,g1 ,g2) (pdisj (vof g1 env) (vof g2 env)))
+      
+      ;;typical interpreter stuff
+      (`,x (guard (symbol? x))
+           (pmatch (apply-env x env)
+                   (`(var ,x ,e) e)
+                   (`(rec ,x ,e) (vof e env))))
+      (`,x (guard (or (number? x) (boolean? x))) x)
+      (`(add1 ,n) (add1 (vof n env)))
+      (`(plus ,n1 ,n2) (+ (vof n1 env) (vof n2 env)))
+      (`(zero? ,n) (zero? (vof n env)))
+      (`(* ,n1 ,n2) (* (vof n1 env) (vof n2 env)))
+      (`(sub1 ,n) (sub1 (vof n env)))
+      (`(if ,t ,c ,a) (if (vof t env) (vof c env) (vof a env)))
+      (`(quote ,x) x)
+      (`(quasiquote ,x) (vof x env))
+      (`((quote unquote) ,x) (vof x env))
+      (`(cons ,x ,y) (cons (vof x env) (vof y env)))
+      (`(car ,l) (car (vof l env)))
+      (`(cdr ,l) (cdr (vof l env)))
+      (`(letrec ((,x ,e)) ,b) (vof b (ext-env 'rec x e env)))
+      (`(lambda ,xs ,e)
+       (let ((vs (for/list ((x xs)) (gensym))))
+         (lambda vs (vof e (foldr (lambda (x v env) (ext-env 'var x v env)) env xs vs)))))
+      (`(,rat . ,rands) (apply (vof rat env) (map (lambda (x) (vof x env)) rands))))))
