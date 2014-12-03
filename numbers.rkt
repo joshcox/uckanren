@@ -1,9 +1,9 @@
 #lang racket
-(require "uk.rkt" "mK.rkt")
+(require "microKanren.rkt")
 (require C311/trace)
-(provide (all-defined-out))
+(provide (all-defined-out) (all-from-out "microKanren.rkt"))
 
-(trace-define appendo
+(define appendo
   (lambda (l s out)
     (conde
       [(== '() l) (== s out)]
