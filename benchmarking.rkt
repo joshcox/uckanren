@@ -1,31 +1,29 @@
 #lang racket
 (require "test-programs.rkt")
 (require C311/pmatch)
+;(require racket/sandbox)
+;(require profile)
+;(require profile/render-text)
 (provide (all-defined-out) (all-from-out "test-programs.rkt"))
 
-(define-syntax-rule (run/time th) (begin (collect-garbage) (time-apply th '())))
-
-(define make-benchmark-suite list)
-
+(define-syntax-rule (run/time th) (time-apply th '()))
 (define-syntax-rule (benchmark str bench) (cons str (lambda () bench)))
-
-(define-syntax-rule (run-benchmark-suite* runner b* ...) (list (run-benchmark-suite b* runner) ...))
-
-(define last-results (make-parameter #f))
+(define-syntax-rule (run-benchmark-suite* runner b* ...) (begin (run-benchmark-suite b* runner) ...))
+(define make-benchmark-suite list)
+;(define call/tsc call-with-trusted-sandbox-configuration)
 
 (define run-benchmark-suite
   (lambda (benchmarks runner)
     (let ((suite-name (car benchmarks)))
-      (last-results
-       (for/list ((i (length (cdr benchmarks))))
-         (let ((b (list-ref (cdr benchmarks) i)))
-           (let ((name (car b)) (benchmark (cdr b)))
-             (let-values (((ans cpu real gc) (run/time benchmark)))
-               (runner suite-name name ans cpu real gc)))))))))
+      (for ((b (cdr benchmarks)))
+        (begin
+          (let-values (((ans cpu real gc) (run/time (cdr b))))
+              (runner suite-name (car b) ans cpu real gc))
+          (collect-garbage))))))
 
 (define std-runner
   (lambda (s n a c r g)
-    (printf "~a : ~a ~nAns: ~a ~nCpu: ~a Real: ~a GC: ~a~n" s n a c r g)))
+    (printf "~a : ~a ~n\tCpu: ~a Real: ~a GC: ~a~n" s n c r g)))
 
 (define (run-all-benchmarks)
   (run-benchmark-suite* std-runner microKanren-benchmarks microKanren-interpreter-benchmarks))
@@ -122,3 +120,6 @@
 
 (define (main)
   (run-all-benchmarks))
+
+;; (define (main)
+;;   (profile-thunk run-all-benchmarks #:render render))
