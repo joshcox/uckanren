@@ -1,46 +1,64 @@
-#lang racket
-(require C311/trace C311/pmatch)
-(provide (all-defined-out))
+#lang scribble/lp
 
-;; Stream Operations
-(trace-define ($-append $1 $2)
-  (cond
-    ((procedure? $1) (lambda () ($-append $2 ($1))))
-    ((null? $1) $2)
-    (else (cons (car $1) ($-append (cdr $1) $2)))))
+@section["Introduction"]
+Logic programming allows us to solve a variety of problems
+by allowing a user to tell what a solution should be rather than
+how to get a solution. Typically, logic programming languages use
+search to find the solutions for a particular description and 
+use unification as a constraint solver. Unfortunately, this search
+and unification combination leads to slow execution. By adding a 
+general constraint framework, we can prune the search tree, fail
+sooner, and perhaps intuit additional information given the current
+state of affairs.Here we present a constraint framework for microKanren.
 
-(trace-define ($-append-map g $)
-  (cond
-    ((procedure? $) (lambda () ($-append-map g ($))))
-    ((null? $) `())
-    (else ($-append (g (car $)) ($-append-map g (cdr $))))))
+@chunk[ <*>
+        (require C311/trace C311/pmatch)
+        (provide (all-defined-out))]
 
-(define mzero (lambda () '()))
 
-(define unit (lambda (x) (cons x (mzero))))
 
+@chunk[ <MicroKanren>
+        (define ($-append $1 $2)
+          (cond
+           ((procedure? $1) (lambda () ($-append $2 ($1))))
+           ((null? $1) $2)
+           (else (cons (car $1) ($-append (cdr $1) $2)))))
+
+        (define ($-append-map g $)
+          (cond
+           ((procedure? $) (lambda () ($-append-map g ($))))
+           ((null? $) `())
+           (else ($-append (g (car $)) ($-append-map g (cdr $))))))
+
+        (define mzero (lambda () '()))
+
+        (define unit (lambda (x) (cons x (mzero))))
+        ]
+
+@chunk[ <Goals>
 ;; Goals
-(trace-define (call/fresh f)
+(define (call/fresh f)
   (lambdas (a : s/c d c)
     (let ((c (cdr s/c)))
       ((f (var c)) (make-a (cons (car s/c) (+ 1 c)) d c)))))
 
-(trace-define (disj g1 g2) (lambdas (a : s/c d c) ($-append (g1 s/c) (g2 s/c))))
+(define (disj g1 g2) (lambdas (a : s/c d c) ($-append (g1 s/c) (g2 s/c))))
 
-(trace-define (conj g1 g2) (lambdas (a : s/c d c) ($-append-map g2 (g1 s/c))))
+(define (conj g1 g2) (lambdas (a : s/c d c) ($-append-map g2 (g1 s/c))))
 
-(trace-define ==
+(define ==
   (lambda (u v)
     (goal-construct (==constraint u v))))
 
-(trace-define ==constraint
+(define ==constraint
   (lambda (u v)
     (lambdas (a : s d c)
       (let ((s^ (unify u v (car s))))
         (if s^ 
             (if (eq? s^ (car s)) a (make-a (cons s^ (cdr s)) d c))
             #f)))))
-
+]
+@chunk[ <Solvers>
 ;; Solvers
 (define (unify u v s)
   (let ((u (walk u s)) (v (walk v s)))
@@ -59,7 +77,8 @@
      ((var? v) (eq? v x))
      ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
      (else #f))))
-
+]
+@chunk[ <Convenience>
 ;; Convenience Operators
 (define identity (lambdas(a) a))
 
@@ -68,7 +87,8 @@
     (lambdas (a)
       (let ((a (f a)))
         (and a (f^ a))))))
-
+]
+@chunk[ <State>
 ;; State
 (define make-a
   (lambda (s d c)
@@ -111,26 +131,28 @@
   (let ((pr (and (var? u) (assv u s))))
     (if pr (walk (cdr pr) s) u)))
 
-(trace-define walk*
+(define walk*
   (lambda (v a)
     (let ((v (walk v (car a))))
       (cond
        ((var? v) v)
        ((pair? v) (cons (walk* (car v) a) (walk* (cdr v) a)))
        (else v)))))
-
+]
+@chunk[ <Constraint_Framework>
 ;; Constraint Framework
 (define process-prefix (make-parameter #f))
 (define enforce-constraints (make-parameter #f))
 (define run-constraints (make-parameter #f))
 
-(trace-define goal-construct
+(define goal-construct
   (lambda (f)
     (lambda (a)
       (cond
        ((f a) => unit)
        (else (mzero))))))
-
+]
+@chunk[ <Reification>
 ;; Reification
 (define (reify-var0 s/c)
   (let ((v (walk* (var 0) (car s/c))))
@@ -148,14 +170,15 @@
 (define (reify-name n)
   (string->symbol
     (string-append "_." (number->string n))))
-
+]
+@chunk[ <Running_MicroKanren>
 ;; Running MicroKanren
 
-(trace-define (call/empty-state g) (g (empty-state)))
+(define (call/empty-state g) (g (empty-state)))
 
-(trace-define (pull $) (if (procedure? $) (pull ($)) $))
+(define (pull $) (if (procedure? $) (pull ($)) $))
 
-(trace-define (take n)
+(define (take n)
   (lambda ($)
     (cond
       ((zero? n) '())
@@ -166,7 +189,8 @@
            (else
             (cons (car $)
              ((take (- n 1)) (cdr $))))))))))
-
+]
+@chunk[ <Syntactic_Sugar>
 ;; MicroKanren Syntactic Sugar
 (define-syntax inverse-eta-delay
   (syntax-rules ()
@@ -253,3 +277,4 @@
   (syntax-rules ()
     ((_ (g0 g ...) (h0 h ...) ...)
      (conda ((once g0) g ...) ((once h0) h ...) ...))))
+]
