@@ -1,16 +1,15 @@
 #lang racket
 (require "test-programs.rkt")
 (require C311/pmatch)
-;(require racket/sandbox)
 ;(require profile)
 ;(require profile/render-text)
 (provide (all-defined-out) (all-from-out "test-programs.rkt"))
 
 (define-syntax-rule (run/time th) (time-apply th '()))
 (define-syntax-rule (benchmark str bench) (cons str (lambda () bench)))
-(define-syntax-rule (run-benchmark-suite* runner b* ...) (begin (run-benchmark-suite b* runner) ...))
+(define-syntax-rule (run-benchmark-suite* runner b* ...) 
+  (begin (begin (printf "~a:~n" (car b*)) (run-benchmark-suite b* runner) (newline)) ...))
 (define make-benchmark-suite list)
-;(define call/tsc call-with-trusted-sandbox-configuration)
 
 (define run-benchmark-suite
   (lambda (benchmarks runner)
@@ -23,10 +22,9 @@
 
 (define std-runner
   (lambda (s n a c r g)
-    (printf "~a : ~a ~n\tCpu: ~a Real: ~a GC: ~a~n" s n c r g)))
+    (printf "\t~a ~n\t  Cpu: ~a Real: ~a GC: ~a~n" n c r g)))
 
-(define (run-all-benchmarks)
-  (run-benchmark-suite* std-runner microKanren-benchmarks microKanren-interpreter-benchmarks))
+;; MicroKanren Benchmarking
 
 (define als (build-list 100 (lambda (x) 'a)))
 (define als2 (build-list 500 (lambda (x) 'a)))
@@ -117,6 +115,9 @@
                                                   ((appendo res (cons a '()) o) s/c)))))))))))))))
              (run 1 (q) (reverseo (quote ,als) q))))))
                   ))
+
+(define (run-all-benchmarks)
+  (run-benchmark-suite* std-runner microKanren-benchmarks microKanren-interpreter-benchmarks))
 
 (define (main)
   (run-all-benchmarks))
