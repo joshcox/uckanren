@@ -290,6 +290,27 @@
              (pluso bq r n)
              (<o n bq1))))))))
 
+(define pexp2
+  (lambda (n b q)
+    (pconde
+      ((== '(1) n) (== '() q))
+      ((>1o n) (== '(1) q)
+       (fresh (s)
+         (splito n b s '(1))))
+      ((fresh (q1 b2)
+         (== `(0 . ,q1) q)
+         (poso q1)
+         (<lo b n)
+         (orig-appendo b `(1 . ,b) b2)
+         (exp2 n b2 q1)))
+      ((fresh (q1 nh b2 s)
+         (== `(1 . ,q1) q)
+         (poso q1)
+         (poso nh)
+         (splito n b s nh)
+         (orig-appendo b `(1 . ,b) b2)
+         (exp2 nh b2 q1))))))
+
 (define exp2
   (lambda (n b q)
     (conde

@@ -43,6 +43,9 @@
   (make-benchmark-suite
    "microKanren - nonInterpreter"
 
+   (benchmark "1000^2" (run 1 (q) (fresh (a b) (*o num1000 num1000 a) (exp2 b '() (build-num 50)) (*o a b q))))
+   (benchmark "1000^2" (run 1 (q) (fresh (a b) (pexp2 b '() (build-num 50)) (*o num1000 num1000 a) (*o a b q))))
+
    (benchmark "1000^2" (run 1 (q) (*o num1000 num1000 q)))
    (benchmark "Parellel 1000^2" (run 1 (q) (p*o num1000 num1000 q)))
 

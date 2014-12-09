@@ -69,10 +69,7 @@
   (lambda goals
     (serial-lambda (s/c)
       (let ((s/c ((car goals) s/c)))
-        (foldl (lambda (f x) ($-append-map f x)) s/c (cdr goals)))
-      )))
-
-;(define (cconj g1 g2) (serial-lambda (s/c) ($-append-map g2 (g1 s/c))))
+        (foldl (lambda (f x) ($-append-map f x)) s/c (cdr goals))))))
 
 (define c$a (curry $-append))
 
