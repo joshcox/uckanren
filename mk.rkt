@@ -2,6 +2,7 @@
 (require C311/trace C311/pmatch)
 ;(require racket/fasl)
 ;(require "close-exp.rkt")
+(require data/queue)
 (require web-server/lang/serial-lambda
          racket/serialize)
 (provide (all-defined-out))
@@ -11,13 +12,13 @@
 
 (define ($-append $1 $2)
   (cond
-    ((procedure? $1) (lambda () ($-append $2 ($1))))
+    ((procedure? $1) (serial-lambda () ($-append $2 ($1))))
     ((null? $1) $2)
     (else (cons (car $1) ($-append (cdr $1) $2)))))
 
 (define ($-append-map g $)
   (cond
-    ((procedure? $) (lambda () ($-append-map g ($))))
+    ((procedure? $) (serial-lambda () ($-append-map g ($))))
     ((null? $) `())
     (else ($-append (g (car $)) ($-append-map g (cdr $))))))
 
@@ -63,31 +64,82 @@
       ((f (var c)) (cons (car s/c) (+ 1 c))))))
 
 (define (disj g1 g2) (serial-lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
-(define (conj g1 g2) (serial-lambda (s/c) ($-append-map g2 (g1 s/c))))
+
+(define conj
+  (lambda goals
+    (serial-lambda (s/c)
+      (let ((s/c ((car goals) s/c)))
+        (foldl (lambda (f x) ($-append-map f x)) s/c (cdr goals)))
+      )))
+
+;(define (cconj g1 g2) (serial-lambda (s/c) ($-append-map g2 (g1 s/c))))
 
 (define c$a (curry $-append))
 
-(define p (make-parameter #f))
-(define (init-place)
-  (p (dynamic-place "mk.rkt" 'main2)))
+(define place* (make-parameter '()))
+(define receiver (make-parameter #f))
 
-(define main2
-  (lambda (ch)
-    (let f ()
-      (let* ((g (deserialize (place-channel-get ch)))
-            (s/c (deserialize (place-channel-get ch)))
-            (t (thread (lambda () (place-channel-put ch (serialize (g s/c)))))))
-        (f)))))
+(define make-places
+  (lambda (num)
+    (place* (for/list ((i (min num (sub1 (processor-count)))))
+              (place receiver
+                     (let ()
+                       (define pdisj disj)
+                       (define (main)
+                         (let ((id (place-channel-get receiver))
+                               (sender (place-channel-get receiver)))
+                           (let f ()
+                             (let ((job (place-channel-get receiver)))
+                               (if (eqv? job 'done) (void)
+                                   (let* ((job (deserialize job))
+                                          (job-id (car job))
+                                          (work (cdr job))
+                                          (s/c (deserialize (place-channel-get receiver)))
+                                          (package (cons id (cons job-id (work s/c)))))
+                                     (place-channel-put sender (serialize package))
+                                     (f)))))))
+                       (main)))))
+    (let-values (((rec sen) (place-channel)))
+      (receiver rec)
+      (for ((place (place*)) (i (in-range num))) (place-channel-put place i) (place-channel-put place sen)))))
 
-(define-syntax pdisj
-  (syntax-rules ()
-    ((_ g1 g2) 
-     (serial-lambda (s/c)
-       (place-channel-put (p) (serialize g1))
-       (place-channel-put (p) (serialize s/c))
-       ((c$a (g2 s/c)) (deserialize (sync (p))))))))
-
-(define pconj conj)
+(define pdisj
+  (lambda jobs
+    (serial-lambda (s/c)
+      (let* ((jobs-num (length jobs))
+           (q (make-queue))
+           (jobs-queue (begin (for ((job jobs) (i (in-range jobs-num))) (enqueue! q (cons i job))) q))
+           (jobs (make-hash))
+           (s/c (serialize s/c)))
+      (make-places (sub1 jobs-num))
+      (let* ((ch (make-channel))
+             (appender (thread (lambda ()
+                                 (let f (($ '()) ($1 (channel-get ch)))
+                                   (if (eqv? $1 'done)
+                                       (begin (hash-set! jobs -1 $) (channel-put ch -1))
+                                       (f ($-append (hash-ref jobs $1) $) (channel-get ch)))))))
+             (sendj (lambda (place)
+                      (if (queue-empty? jobs-queue) (void)
+                          (let ((job (dequeue! jobs-queue)))
+                            (hash-set! jobs (car job) #f)
+                            (place-channel-put place (serialize job))
+                            (place-channel-put place s/c))))))
+        (for ((place (place*))) (sendj place))
+        (let f ()
+          (let ((msg (place-channel-get (receiver))))
+            (let ((msg (deserialize msg)))
+              (pmatch msg
+                      (`(,place ,job-id . ,ans)
+                       (begin (sendj (list-ref (place*) place))
+                              (hash-set! jobs job-id ans)
+                              (set! jobs-num (sub1 jobs-num))
+                              (channel-put ch job-id))))))
+          
+          (if (zero? jobs-num)
+              (begin (for ((place (place*))) (place-kill place))
+                     (channel-put ch 'done)
+                     (hash-ref jobs (channel-get ch)))
+              (f))))))))
 
 (define (call/empty-state g) (g (cons '() 0)))
 
@@ -158,10 +210,12 @@
   (syntax-rules ()
     ((_ g) (serial-lambda (s/c) (serial-lambda () (g s/c))))))
 
-(define-syntax conj+
-  (syntax-rules ()
-    ((_ g) g)
-    ((_ g0 g ...) (conj g0 (conj+ g ...)))))
+;; (define-syntax conj+
+;;   (syntax-rules ()
+;;     ((_ g) g)
+;;     ((_ g0 g ...) (conj g0 (conj+ g ...)))))
+
+(define conj+ conj)
 
 (define-syntax disj+
   (syntax-rules ()
@@ -171,12 +225,7 @@
 (define-syntax pconj+
   (syntax-rules ()
     ((_ g) g)
-    ((_ g0 g ...) (pconj g0 (pconj+ g ...)))))
-
-(define-syntax pdisj+
-  (syntax-rules ()
-    ((_ g) g)
-    ((_ g0 g ...) (pdisj g0 (pdisj+ g ...)))))
+    ((_ g0 g ...) (pconj g0 (conj+ g ...)))))
 
 (define-syntax fresh
   (syntax-rules ()
@@ -189,15 +238,14 @@
   (syntax-rules ()
     ((_ (g0 g ...) (g0* g* ...) ...)
      (inverse-eta-delay
-      (pdisj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
+      (let ((pdisj disj) (disj pdisj))
+        (disj (conj+ g0 g ...) (conj+ g0* g* ...) ...))))))
 
 (define-syntax conde
   (syntax-rules ()
     ((_ (g0 g ...) (g0* g* ...) ...)
      (inverse-eta-delay
       (disj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
-
-
 
 (define-syntax run
   (syntax-rules ()

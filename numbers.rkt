@@ -106,6 +106,27 @@
          (== `(1 . ,y) m) (poso y)
          (odd-*o x n m p))))))
 
+(define p*o
+  (lambda (n m p)
+    (pconde
+      ((== '() n) (== '() p))
+      ((poso n) (== '() m) (== '() p))
+      ((== '(1) n) (poso m) (== m p))
+      ((>1o n) (== '(1) m) (== n p))
+      ((fresh (x z)
+         (== `(0 . ,x) n) (poso x)
+         (== `(0 . ,z) p) (poso z)
+         (>1o m)
+         (*o x m z)))
+      ((fresh (x y)
+         (== `(1 . ,x) n) (poso x)
+         (== `(0 . ,y) m) (poso y)
+         (*o m n p)))
+      ((fresh (x y)
+         (== `(1 . ,x) n) (poso x)
+         (== `(1 . ,y) m) (poso y)
+         (odd-*o x n m p))))))
+
 (define odd-*o
   (lambda (x n m p)
     (fresh (q)
