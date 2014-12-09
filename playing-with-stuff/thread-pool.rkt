@@ -1,7 +1,7 @@
 #lang racket
 ;(require racket/threads)
 
-(define (make-pool-for-each n)
+(define (thread-pool n)
   (lambda (proc items)
     (define tasks (make-channel))
     (define results (make-semaphore))
@@ -24,7 +24,8 @@
         (for-each
          (lambda (item)
            (semaphore-wait results))
-         items))
+         items)
+        )
       (lambda ()
         (for-each
          (lambda (t)
@@ -33,7 +34,7 @@
          threads)))))
 
 (define (example)
-  (define pool-for-each (make-pool-for-each 20))
+  (define pool-for-each (thread-pool 20))
   (pool-for-each
    (lambda (i) 
      ;(sleep 1)
@@ -41,4 +42,4 @@
      (flush-output))
    (build-list 100 (lambda (i) (- 100 i)))))
 
-(provide make-pool-for-each example)
+(provide thread-pool example)

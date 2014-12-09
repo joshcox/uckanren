@@ -1,7 +1,9 @@
 #lang racket
 (require C311/trace C311/pmatch)
-(require racket/fasl)
-(require "close-exp.rkt")
+;(require racket/fasl)
+;(require "close-exp.rkt")
+(require web-server/lang/serial-lambda
+         racket/serialize)
 (provide (all-defined-out))
 
 (define-namespace-anchor anc)
@@ -47,34 +49,19 @@
       (else #f))))
 
 (define (== u v)
-  (lambda (s/c)
+  (serial-lambda (s/c)
     (let ((s (unify u v (car s/c))))
       (if s (list (cons s (cdr s/c))) `()))))
 
 (define (call/fresh f)
-  (lambda (s/c)
+  (serial-lambda (s/c)
     (let ((c (cdr s/c)))
       ((f (var c)) (cons (car s/c) (+ 1 c))))))
 
-(define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
-(define (conj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
+(define (disj g1 g2) (serial-lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
+(define (conj g1 g2) (serial-lambda (s/c) ($-append-map g2 (g1 s/c))))
 
 (define c$a (curry $-append))
-
-;; (define (pdisj g1 g2)
-;;   (set! cnt (add1 cnt))
-;;   (lambda (s/c)
-;;     (let ((ch (make-async-channel)))
-;;       (let ((t (thread (lambda () (async-channel-put ch (g2 s/c))))))
-;;         (((curry $-append) (g1 s/c)) (let ((v (sync ch))) (kill-thread t) v))))))
-
-
-;; (define pdisj
-;;   (lambda (g1 g2)
-;;     (set! cnt (add1 cnt))
-;;     (lambda (s/c)
-;;       (let ((t (mk-future (lambda () (g2 s/c)))))
-;;         ((c$a (g1 s/c)) (sync t))))))
 
 (define p (make-parameter #f))
 (define (init-place)
@@ -82,32 +69,19 @@
 
 (define main2
   (lambda (ch)
-    (displayln '4)
     (let f ()
-      (let ((g (eval-fasl (place-channel-get ch) ns))
-            (s/c (eval-fasl (place-channel-get ch) ns)))
-        (let ((e (g s/c)))
-          (place-channel-put ch (close-exp->fasl e))))
-      (f))))
+      (let* ((g (deserialize (place-channel-get ch)))
+            (s/c (deserialize (place-channel-get ch)))
+            (t (thread (lambda () (place-channel-put ch (serialize (g s/c)))))))
+        (f)))))
 
 (define-syntax pdisj
   (syntax-rules ()
     ((_ g1 g2) 
-     (lambda (s/c)
-       (displayln '1)
-       (place-channel-put (p) (close-exp->fasl g2))
-       (displayln '2)
-       (place-channel-put (p) (close-exp->fasl s/c))
-       (displayln '3)
-       ((c$a (g1 s/c)) (eval-fasl (sync (p)) ns))))))
-
-;; (define pdisj
-;;   (lambda (g1 g2)
-;;     (lambda (s/c)
-;;       (let ((p (dynamic-place "mk.rkt" 'main2)))
-;;         (place-channel-put p (serialize-exp g1))
-;;         (place-channel-put p (serialize-exp s/c))
-;;         ((c$a (g2 s/c)) (sync p))))))
+     (serial-lambda (s/c)
+       (place-channel-put (p) (serialize g1))
+       (place-channel-put (p) (serialize s/c))
+       ((c$a (g2 s/c)) (deserialize (sync (p))))))))
 
 (define pconj conj)
 
@@ -178,7 +152,7 @@
 ;; miniKanren
 (define-syntax inverse-eta-delay
   (syntax-rules ()
-    ((_ g) (lambda (s/c) (lambda () (g s/c))))))
+    ((_ g) (serial-lambda (s/c) (serial-lambda () (g s/c))))))
 
 (define-syntax conj+
   (syntax-rules ()
@@ -205,7 +179,7 @@
     ((_ () g0 g ...)
      (inverse-eta-delay (conj+ g0 g ...)))
     ((_ (x0 x ...) g0 g ...)
-     (call/fresh (lambda (x0) (fresh (x ...) g0 g ...))))))
+     (call/fresh (serial-lambda (x0) (fresh (x ...) g0 g ...))))))
 
 (define-syntax pconde
   (syntax-rules ()

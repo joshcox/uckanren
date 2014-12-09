@@ -41,13 +41,18 @@
   (make-benchmark-suite
    "microKanren - nonInterpreter"
    
+   (benchmark "two big items"
+              (run 2 (q) (disj (reverseo ls50 q) (reverseo ls50 q))))
+   (benchmark "two big items"
+              (run 2 (q) (pdisj (reverseo ls50 q) (reverseo ls50 q))))
+   
    ;(benchmark "Appendo" (run 1 (q) (pappendo2 '(a b) '(c d) q)))
    (benchmark "Reverseo ~~ 25" (run 1 (q) (reverseo ls25 q)))
    (benchmark "Concurrent Reverseo ~~ 25" (run 1 (q) (preverseo ls25 q)))
    (benchmark "Reverseo ~~ 50" (run 1 (q) (reverseo ls50 q)))
    (benchmark "Concurrent Reverseo ~~ 50" (run 1 (q) (preverseo ls50 q)))
-   (benchmark "Reverseo ~~ 100" (run 1 (q) (reverseo ls100 q)))
-   (benchmark "Concurrent Reverseo ~~ 100" (run 1 (q) (preverseo ls100 q)))
+   ;; (benchmark "Reverseo ~~ 100" (run 1 (q) (reverseo ls100 q)))
+   ;; (benchmark "Concurrent Reverseo ~~ 100" (run 1 (q) (preverseo ls100 q)))
    ;; (benchmark "Reverseo ~~ 200"(run 1 (q) (reverseo ls2 q)))
    ;; (benchmark "Concurrent Reverseo ~~ 200" (run 1 (q) (preverseo ls2 q)))
    ))
@@ -64,8 +69,4 @@
 ;;   (run-benchmark-suite* mk-runner microKanren-benchmarks microKanren-interpreter-benchmarks))
 
 (define (main)
-                                        ;(run-all-benchmarks)
   (run-benchmark-suite* mk-runner microKanren-benchmarks))
-
-;; (define (main)
-;;   (profile-thunk run-all-benchmarks #:render render))
