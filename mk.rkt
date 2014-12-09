@@ -1,7 +1,23 @@
 #lang racket
 (require C311/trace C311/pmatch)
-(require racket/async-channel)
+(require racket/fasl)
+(require "close-exp.rkt")
 (provide (all-defined-out))
+
+(define-namespace-anchor anc)
+(define ns (namespace-anchor->namespace anc))
+
+(define ($-append $1 $2)
+  (cond
+    ((procedure? $1) (lambda () ($-append $2 ($1))))
+    ((null? $1) $2)
+    (else (cons (car $1) ($-append (cdr $1) $2)))))
+
+(define ($-append-map g $)
+  (cond
+    ((procedure? $) (lambda () ($-append-map g ($))))
+    ((null? $) `())
+    (else ($-append (g (car $)) ($-append-map g (cdr $))))))
 
 (define (var n) n)
 (define (var? n) (number? n))
@@ -43,25 +59,57 @@
 (define (disj g1 g2) (lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
 (define (conj g1 g2) (lambda (s/c) ($-append-map g2 (g1 s/c))))
 
-(define (pdisj g1 g2)
-  (lambda (s/c)
-    (let ((ch (make-async-channel)))
-      (let ((t (thread (lambda () (async-channel-put ch (g2 s/c))))))
-        (((curry $-append) (g1 s/c)) (let ((v (sync ch))) (kill-thread t) v))))))
+(define c$a (curry $-append))
+
+;; (define (pdisj g1 g2)
+;;   (set! cnt (add1 cnt))
+;;   (lambda (s/c)
+;;     (let ((ch (make-async-channel)))
+;;       (let ((t (thread (lambda () (async-channel-put ch (g2 s/c))))))
+;;         (((curry $-append) (g1 s/c)) (let ((v (sync ch))) (kill-thread t) v))))))
+
+
+;; (define pdisj
+;;   (lambda (g1 g2)
+;;     (set! cnt (add1 cnt))
+;;     (lambda (s/c)
+;;       (let ((t (mk-future (lambda () (g2 s/c)))))
+;;         ((c$a (g1 s/c)) (sync t))))))
+
+(define p (make-parameter #f))
+(define (init-place)
+  (p (dynamic-place "mk.rkt" 'main2)))
+
+(define main2
+  (lambda (ch)
+    (displayln '4)
+    (let f ()
+      (let ((g (eval-fasl (place-channel-get ch) ns))
+            (s/c (eval-fasl (place-channel-get ch) ns)))
+        (let ((e (g s/c)))
+          (place-channel-put ch (close-exp->fasl e))))
+      (f))))
+
+(define-syntax pdisj
+  (syntax-rules ()
+    ((_ g1 g2) 
+     (lambda (s/c)
+       (displayln '1)
+       (place-channel-put (p) (close-exp->fasl g2))
+       (displayln '2)
+       (place-channel-put (p) (close-exp->fasl s/c))
+       (displayln '3)
+       ((c$a (g1 s/c)) (eval-fasl (sync (p)) ns))))))
+
+;; (define pdisj
+;;   (lambda (g1 g2)
+;;     (lambda (s/c)
+;;       (let ((p (dynamic-place "mk.rkt" 'main2)))
+;;         (place-channel-put p (serialize-exp g1))
+;;         (place-channel-put p (serialize-exp s/c))
+;;         ((c$a (g2 s/c)) (sync p))))))
 
 (define pconj conj)
-
-(define ($-append $1 $2)
-  (cond
-    ((procedure? $1) (lambda () ($-append $2 ($1))))
-    ((null? $1) $2)
-    (else (cons (car $1) ($-append (cdr $1) $2)))))
-
-(define ($-append-map g $)
-  (cond
-    ((procedure? $) (lambda () ($-append-map g ($))))
-    ((null? $) `())
-    (else ($-append (g (car $)) ($-append-map g (cdr $))))))
 
 (define (call/empty-state g) (g (cons '() 0)))
 
@@ -105,3 +153,100 @@
 
 
 
+;;impure microKanren extensions
+(define succeed (lambda (s/c) (list s/c)))
+(define fail (lambda (s/c) `()))
+(define (ifte g0 g1 g2)
+  (lambda (s/c)
+    (let loop (($ (g0 s/c)))
+      (cond
+        ((procedure? $) (lambda () (loop ($))))
+        ((null? $) (g2 s/c))
+        (else ($-append-map g1 $))))))
+(define (once g)
+  (lambda (s/c)
+    (let loop (($ (g s/c)))
+      (cond
+        ((procedure? $) (lambda () (loop ($))))
+        ((null? $) `())
+        (else (list (car $)))))))
+(define (call/project x f)
+  (lambda (s/c)
+    ((f (walk* x (car s/c))) s/c)))
+
+
+;; miniKanren
+(define-syntax inverse-eta-delay
+  (syntax-rules ()
+    ((_ g) (lambda (s/c) (lambda () (g s/c))))))
+
+(define-syntax conj+
+  (syntax-rules ()
+    ((_ g) g)
+    ((_ g0 g ...) (conj g0 (conj+ g ...)))))
+
+(define-syntax disj+
+  (syntax-rules ()
+    ((_ g) g)
+    ((_ g0 g ...) (disj g0 (disj+ g ...)))))
+
+(define-syntax pconj+
+  (syntax-rules ()
+    ((_ g) g)
+    ((_ g0 g ...) (pconj g0 (pconj+ g ...)))))
+
+(define-syntax pdisj+
+  (syntax-rules ()
+    ((_ g) g)
+    ((_ g0 g ...) (pdisj g0 (pdisj+ g ...)))))
+
+(define-syntax fresh
+  (syntax-rules ()
+    ((_ () g0 g ...)
+     (inverse-eta-delay (conj+ g0 g ...)))
+    ((_ (x0 x ...) g0 g ...)
+     (call/fresh (lambda (x0) (fresh (x ...) g0 g ...))))))
+
+(define-syntax pconde
+  (syntax-rules ()
+    ((_ (g0 g ...) (g0* g* ...) ...)
+     (inverse-eta-delay
+      (pdisj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
+
+(define-syntax conde
+  (syntax-rules ()
+    ((_ (g0 g ...) (g0* g* ...) ...)
+     (inverse-eta-delay
+      (disj+ (conj+ g0 g ...) (conj+ g0* g* ...) ...)))))
+
+
+
+(define-syntax run
+  (syntax-rules ()
+    ((_ n (q) g0 g ...)
+     (map reify-var0
+          ((take n)
+           (call/empty-state (fresh (q) g0 g ...)))))))
+
+
+;; impure minikanren extensions
+(define-syntax project
+  (syntax-rules ()
+    ((_ () g0 g ...) (conj+ g0 g ...))
+    ((_ (x0 x ...) g0 g ...)
+     (call/project x0 
+       (lambda (x0) (project (x ...) g0 g ...))))))
+(define-syntax ifte*
+  (syntax-rules ()
+    ((_ (g0 g ...)) (conj+ g0 g ...))
+    ((_ (g0 g1 g ...) (h0 h ...) ...)
+     (ifte g0 (conj+ g1 g ...) (ifte* (h0 h ...) ...)))))
+(define-syntax conda
+  (syntax-rules ()
+    ((_ (g0 g ...) (h0 h ...) ...)
+     (inverse-eta-delay
+      (ifte* (g0 g ... succeed) (h0 h ... succeed) ... (fail))))))
+(define-syntax condu
+  (syntax-rules ()
+    ((_ (g0 g ...) (h0 h ...) ...)
+     (conda ((once g0) g ...) ((once h0) h ...) ...))))

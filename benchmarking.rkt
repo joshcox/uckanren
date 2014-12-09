@@ -1,5 +1,5 @@
 #lang racket
-(require "test-programs.rkt")
+(require "mk.rkt" "extras-mk.rkt" "test-programs.rkt")
 (require C311/pmatch)
 ;(require profile)
 ;(require profile/render-text)
@@ -17,110 +17,55 @@
       (for ((b (cdr benchmarks)))
         (begin
           (let-values (((ans cpu real gc) (run/time (cdr b))))
-              (runner suite-name (car b) ans cpu real gc))
+              (runner suite-name (car b) (car ans) cpu real gc))
           (collect-garbage))))))
 
-(define std-runner
-  (lambda (s n a c r g)
-    (printf "\t~a ~n\t  Cpu: ~a Real: ~a GC: ~a~n" n c r g)))
+;; Runners :: (suite-name, bench-name, ans, cpu-time, real-time, gc-time) -> something
+(define-syntax-rule (runner (v ...) exp) (lambda (v ...) exp))
+(define-syntax-rule (runners (v ...) r ...) (lambda (v ...) (begin (r v ...) ...)))
+
+(define std-runner (runner (s n a c r g) (printf "\t~a ~n\t  Cpu: ~a Real: ~a GC: ~a~n" n c r g)))
+(define print-answer (runner (s n a c r g) (printf "\t  ~a~n" a)))
+(define mk-runner (runners (s n a c r g) std-runner print-answer))
 
 ;; MicroKanren Benchmarking
+(define a '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+(define ls25 (build-list 25 (lambda (i) (list-ref a (modulo i 26)))))
+(define ls50 (build-list 50 (lambda (i) (list-ref a (modulo i 26)))))
+(define ls100 (build-list 100 (lambda (i) (list-ref a (modulo i 26)))))
+(define ls2 (build-list 200 (lambda (i) (list-ref a (modulo i 26)))))
 
-(define als (build-list 100 (lambda (x) 'a)))
-(define als2 (build-list 500 (lambda (x) 'a)))
+(time (init-place))
 
 (define microKanren-benchmarks
   (make-benchmark-suite
    "microKanren - nonInterpreter"
-   (benchmark "Basic mk"
-              (run 3 (q) (call/fresh (lambda (a) (conj (== q a) (disj (== a 'a) (== a 'b)))))))
-   (benchmark "Basic pmk"
-              (run 3 (q) (call/fresh (lambda (a) (pconj (== q a) (pdisj (== a 'a) (== a 'b)))))))
-   (benchmark "Reverseo of list of length 100" (run 1 (q) (reverseo als q)))
-   (benchmark "Concurrent Reverseo of list of length 100"(run 1 (q) (preverseo als q)))))
+   
+   ;(benchmark "Appendo" (run 1 (q) (pappendo2 '(a b) '(c d) q)))
+   (benchmark "Reverseo ~~ 25" (run 1 (q) (reverseo ls25 q)))
+   (benchmark "Concurrent Reverseo ~~ 25" (run 1 (q) (preverseo ls25 q)))
+   (benchmark "Reverseo ~~ 50" (run 1 (q) (reverseo ls50 q)))
+   (benchmark "Concurrent Reverseo ~~ 50" (run 1 (q) (preverseo ls50 q)))
+   (benchmark "Reverseo ~~ 100" (run 1 (q) (reverseo ls100 q)))
+   (benchmark "Concurrent Reverseo ~~ 100" (run 1 (q) (preverseo ls100 q)))
+   ;; (benchmark "Reverseo ~~ 200"(run 1 (q) (reverseo ls2 q)))
+   ;; (benchmark "Concurrent Reverseo ~~ 200" (run 1 (q) (preverseo ls2 q)))
+   ))
 
-(define microKanren-interpreter-benchmarks
-  (make-benchmark-suite
-   "microKanren - Interpreter"
+;; (define microKanren-interpreter-benchmarks
+;;   (make-benchmark-suite
+;;    "microKanren - Interpreter"
+;;    (benchmark "Reverseo ~~ 100" (mk `(run 1 (q) (reverseo (quote ,ls1) q))))
+;;    (benchmark "Concurrent Reverseo ~~ 100" (mk `(run 1 (q) (preverseo (quote ,ls1) q))))
+;;    (benchmark "Reverseo ~~ 200" (mk `(run 1 (q) (reverseo (quote ,ls2) q))))
+;;    (benchmark "Concurrent Reverseo ~~ 200" (mk `(run 1 (q) (preverseo (quote ,ls2) q))))))
 
-   (benchmark
-    "Reverseo of list length 100"
-    (mk `(letrec ((appendo
-                   (lambda (l s o)
-                     (disj
-                      (conj (== l '()) (== o s))
-                      (call/fresh
-                       (lambda (a)
-                         (call/fresh
-                          (lambda (b)
-                            (call/fresh
-                             (lambda (res)
-                               (conj (== l (cons a b)) ;;`(,a . ,b) 
-                                     (conj (== o (cons a res)) ;; `(,a . ,res)
-                                           (lambda (s/c)
-                                             (lambda ()
-                                               ((appendo b s res) s/c)))))))))))))))
-           (letrec ((reverseo
-                     (lambda (ls o)
-                       (disj
-                        (conj (== ls '()) (== o ls))
-                        (call/fresh
-                         (lambda (a)
-                           (call/fresh
-                            (lambda (b)
-                              (call/fresh
-                               (lambda (res)
-                                 (conj (== (cons a b) ls) ;; `(,a . ,b)
-                                       (conj  (lambda (s/c)
-                                                (lambda ()
-                                                  ((reverseo b res) s/c)))
-                                              (lambda (s/c)
-                                                (lambda ()
-                                                  ((appendo res (cons a '()) o) s/c)))))))))))))))
-             (run 1 (q) (reverseo (quote ,als) q))))))
-
-   (benchmark
-    "P-Reverseo of list of length 100"
-    (mk `(letrec ((appendo
-                   (lambda (l s o)
-                     (pdisj
-                      (conj (== l '()) (== o s))
-                      (call/fresh
-                       (lambda (a)
-                         (call/fresh
-                          (lambda (b)
-                            (call/fresh
-                             (lambda (res)
-                               (conj (== l (cons a b)) ;;`(,a . ,b) 
-                                     (conj (== o (cons a res)) ;; `(,a . ,res)
-                                           (lambda (s/c)
-                                             (lambda ()
-                                               ((appendo b s res) s/c)))))))))))))))
-           (letrec ((reverseo
-                     (lambda (ls o)
-                       (pdisj
-                        (conj (== ls '()) (== o ls))
-                        (call/fresh
-                         (lambda (a)
-                           (call/fresh
-                            (lambda (b)
-                              (call/fresh
-                               (lambda (res)
-                                 (conj (== (cons a b) ls) ;; `(,a . ,b)
-                                       (conj  (lambda (s/c)
-                                                (lambda ()
-                                                  ((reverseo b res) s/c)))
-                                              (lambda (s/c)
-                                                (lambda ()
-                                                  ((appendo res (cons a '()) o) s/c)))))))))))))))
-             (run 1 (q) (reverseo (quote ,als) q))))))
-                  ))
-
-(define (run-all-benchmarks)
-  (run-benchmark-suite* std-runner microKanren-benchmarks microKanren-interpreter-benchmarks))
+;; (define (run-all-benchmarks)
+;;   (run-benchmark-suite* mk-runner microKanren-benchmarks microKanren-interpreter-benchmarks))
 
 (define (main)
-  (run-all-benchmarks))
+                                        ;(run-all-benchmarks)
+  (run-benchmark-suite* mk-runner microKanren-benchmarks))
 
 ;; (define (main)
 ;;   (profile-thunk run-all-benchmarks #:render render))
