@@ -21,28 +21,32 @@
     ((null? $) `())
     (else ($-append (g (car $)) ($-append-map g (cdr $))))))
 
-(define (var n) n)
-(define (var? n) (number? n))
+(define (var n) (vector n))
+(define (var? n) (vector? n))
+(define (var-eqv? u v)
+  (if (and (var? u) (var? v))
+      (eqv? (vector-ref u 0) (vector-ref v 0))
+      #f))
 
 (define (walk u s)
-  (let ((pr (and (var? u) (assv u s))))
+  (let ((pr (and (var? u) (assoc u s var-eqv?))))
     (if pr (walk (cdr pr) s) u)))
 
 (define (occurs? x v s)
   (let ((v (walk v s)))
     (cond
-     ((var? v) (eq? v x))
+     ((var? v) (eqv? (vector-ref v 0) x))
      ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
      (else #f))))
 
-(define (ext-s x v s) (if (occurs? x v s) #f (cons (cons x v) s)))
+(define (ext-s x v s) (if (occurs? x v s) #f (cons (cons (var x) v) s)))
 
 (define (unify u v s)
   (let ((u (walk u s)) (v (walk v s)))
     (cond
-      ((eqv? u v) s)
-      ((var? u) (ext-s u v s))
-      ((var? v) (ext-s v u s))
+      ((or (eqv? u v) (var-eqv? u v)) s)
+      ((var? u) (ext-s (vector-ref u 0) v s))
+      ((var? v) (ext-s (vector-ref v 0) u s))
       ((and (pair? u) (pair? v))
        (let ((s (unify (car u) (car v) s)))
          (and s (unify (cdr u) (cdr v) s))))

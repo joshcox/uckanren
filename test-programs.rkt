@@ -1,5 +1,5 @@
 #lang racket
-(require "mk.rkt" "extras-mK.rkt")
+(require "mk.rkt" "extras-mk.rkt")
 (provide (all-defined-out))
 
 ;; test programs
