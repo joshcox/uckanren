@@ -26,7 +26,13 @@
 
 (define std-runner (runner (s n a c r g) (printf "\t~a ~n\t  Cpu: ~a Real: ~a GC: ~a~n" n c r g)))
 (define print-answer (runner (s n a c r g) (printf "\t  ~a~n" a)))
-(define mk-runner (runners (s n a c r g) std-runner print-answer))
+(define mk-runner (runners (s n a c r g) write-answer std-runner print-answer))
+(define write-answer 
+  (runner (s n a c r g)
+    (let ((f (open-output-file 
+              (build-path (current-directory) "benchmark-results" (string-append n ".txt"))
+              #:exists 'append)))
+      (write r f)(newline f))))
 
 ;; MicroKanren Benchmarking
 (define a '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
@@ -57,11 +63,11 @@
               (run 2 (q) (pdisj (reverseo ls50 q) (reverseo ls50 q))))
    
    
-   (benchmark "Reverseo ~~ 25" (run 1 (q) (reverseo ls25 q)))
-   (benchmark "Concurrent Reverseo ~~ 25" (run 1 (q) (preverseo ls25 q)))
+   ;; (benchmark "Reverseo ~~ 25" (run 1 (q) (reverseo ls25 q)))
+   ;; (benchmark "Concurrent Reverseo ~~ 25" (run 1 (q) (preverseo ls25 q)))
    
-   (benchmark "Reverseo ~~ 50" (run 1 (q) (reverseo ls50 q)))
-   (benchmark "Concurrent Reverseo ~~ 50" (run 1 (q) (preverseo ls50 q)))
+   ;; (benchmark "Reverseo ~~ 50" (run 1 (q) (reverseo ls50 q)))
+   ;; (benchmark "Concurrent Reverseo ~~ 50" (run 1 (q) (preverseo ls50 q)))
    
    ;(benchmark "Appendo" (run 1 (q) (pappendo2 '(a b) '(c d) q)))
    ;; (benchmark "Reverseo ~~ 100" (run 1 (q) (reverseo ls100 q)))
