@@ -1,7 +1,6 @@
 #lang racket
 (require C311/trace C311/pmatch)
-;(require racket/fasl)
-;(require "close-exp.rkt")
+(require "vector-var-a-list-substitution.rkt")
 (require data/queue)
 (require web-server/lang/serial-lambda
          racket/serialize)
@@ -9,69 +8,6 @@
 
 (define-namespace-anchor anc)
 (define ns (namespace-anchor->namespace anc))
-
-(define ($-append $1 $2)
-  (cond
-    ((procedure? $1) (serial-lambda () ($-append $2 ($1))))
-    ((null? $1) $2)
-    (else (cons (car $1) ($-append (cdr $1) $2)))))
-
-(define ($-append-map g $)
-  (cond
-    ((procedure? $) (serial-lambda () ($-append-map g ($))))
-    ((null? $) `())
-    (else ($-append (g (car $)) ($-append-map g (cdr $))))))
-
-(define (var n) (vector n))
-(define (var? n) (vector? n))
-(define (var-eqv? u v)
-  (if (and (var? u) (var? v))
-      (eqv? (vector-ref u 0) (vector-ref v 0))
-      #f))
-
-(define (walk u s)
-  (let ((pr (and (var? u) (assoc u s var-eqv?))))
-    (if pr (walk (cdr pr) s) u)))
-
-(define (occurs? x v s)
-  (let ((v (walk v s)))
-    (cond
-     ((var? v) (eqv? (vector-ref v 0) x))
-     ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
-     (else #f))))
-
-(define (ext-s x v s) (if (occurs? x v s) #f (cons (cons (var x) v) s)))
-
-(define (unify u v s)
-  (let ((u (walk u s)) (v (walk v s)))
-    (cond
-      ((or (eqv? u v) (var-eqv? u v)) s)
-      ((var? u) (ext-s (vector-ref u 0) v s))
-      ((var? v) (ext-s (vector-ref v 0) u s))
-      ((and (pair? u) (pair? v))
-       (let ((s (unify (car u) (car v) s)))
-         (and s (unify (cdr u) (cdr v) s))))
-      (else #f))))
-
-(define (== u v)
-  (serial-lambda (s/c)
-    (let ((s (unify u v (car s/c))))
-      (if s (list (cons s (cdr s/c))) `()))))
-
-(define (call/fresh f)
-  (serial-lambda (s/c)
-    (let ((c (cdr s/c)))
-      ((f (var c)) (cons (car s/c) (+ 1 c))))))
-
-(define (disj g1 g2) (serial-lambda (s/c) ($-append (g1 s/c) (g2 s/c))))
-
-(define conj
-  (lambda goals
-    (serial-lambda (s/c)
-      (let ((s/c ((car goals) s/c)))
-        (foldl (lambda (f x) ($-append-map f x)) s/c (cdr goals))))))
-
-(define c$a (curry $-append))
 
 (define place* (make-parameter '()))
 (define receiver (make-parameter #f))
@@ -138,7 +74,7 @@
                      (hash-ref jobs (channel-get ch)))
               (f))))))))
 
-(define (call/empty-state g) (g (cons '() 0)))
+(define (call/empty-state g) (g (empty-state)))
 
 (define (pull $) (if (procedure? $) (pull ($)) $))
 
@@ -153,30 +89,6 @@
            (else
             (cons (car $)
              ((take (- n 1)) (cdr $))))))))))
-
-(define (walk* v s)
-  (let ((v (walk v s)))
-    (cond
-      ((var? v) v)
-      ((pair? v) (cons (walk* (car v) s) (walk* (cdr v) s)))
-      (else v))))
-
-(define (reify-var0 s/c)
-  (let ((v (walk* (var 0) (car s/c))))
-    (walk* v (reify-s v '()))))
-
-(define (reify-s v s)
-  (let ((v (walk v s)))
-    (cond
-      ((var? v)
-       (let ((name (reify-name (length s))))
-         (cons (cons v name) s)))
-      ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
-      (else s))))
-
-(define (reify-name n)
-  (string->symbol
-    (string-append "_." (number->string n))))
 
 
 
@@ -197,9 +109,9 @@
         ((procedure? $) (lambda () (loop ($))))
         ((null? $) `())
         (else (list (car $)))))))
-(define (call/project x f)
-  (lambda (s/c)
-    ((f (walk* x (car s/c))) s/c)))
+;; (define (call/project x f)
+;;   (lambda (s/c)
+;;     ((f (walk* x (car s/c))) s/c)))
 
 
 ;; miniKanren
@@ -273,3 +185,10 @@
   (syntax-rules ()
     ((_ (g0 g ...) (h0 h ...) ...)
      (conda ((once g0) g ...) ((once h0) h ...) ...))))
+(define conj-n-ary
+  (lambda goals
+    (serial-lambda (s/c)
+      (let ((s/c ((car goals) s/c)))
+        (foldl (lambda (f x) ($-append-map f x)) s/c (cdr goals))))))
+
+(define c$a (curry $-append))
