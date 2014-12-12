@@ -1,6 +1,5 @@
 #lang racket
-(require "mk.rkt")
-(require C311/trace)
+(require "../miniKanren-base/miniKanren-base.rkt")
 (provide (all-defined-out))
 
 (define orig-appendo
@@ -88,27 +87,6 @@
 (define *o
   (lambda (n m p)
     (conde
-      ((== '() n) (== '() p))
-      ((poso n) (== '() m) (== '() p))
-      ((== '(1) n) (poso m) (== m p))
-      ((>1o n) (== '(1) m) (== n p))
-      ((fresh (x z)
-         (== `(0 . ,x) n) (poso x)
-         (== `(0 . ,z) p) (poso z)
-         (>1o m)
-         (*o x m z)))
-      ((fresh (x y)
-         (== `(1 . ,x) n) (poso x)
-         (== `(0 . ,y) m) (poso y)
-         (*o m n p)))
-      ((fresh (x y)
-         (== `(1 . ,x) n) (poso x)
-         (== `(1 . ,y) m) (poso y)
-         (odd-*o x n m p))))))
-
-(define p*o
-  (lambda (n m p)
-    (pconde
       ((== '() n) (== '() p))
       ((poso n) (== '() m) (== '() p))
       ((== '(1) n) (poso m) (== m p))
@@ -289,27 +267,6 @@
              (*o b bq bq1)
              (pluso bq r n)
              (<o n bq1))))))))
-
-(define pexp2
-  (lambda (n b q)
-    (pconde
-      ((== '(1) n) (== '() q))
-      ((>1o n) (== '(1) q)
-       (fresh (s)
-         (splito n b s '(1))))
-      ((fresh (q1 b2)
-         (== `(0 . ,q1) q)
-         (poso q1)
-         (<lo b n)
-         (orig-appendo b `(1 . ,b) b2)
-         (exp2 n b2 q1)))
-      ((fresh (q1 nh b2 s)
-         (== `(1 . ,q1) q)
-         (poso q1)
-         (poso nh)
-         (splito n b s nh)
-         (orig-appendo b `(1 . ,b) b2)
-         (exp2 nh b2 q1))))))
 
 (define exp2
   (lambda (n b q)
