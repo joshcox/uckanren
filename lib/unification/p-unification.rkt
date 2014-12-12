@@ -1,9 +1,10 @@
 #lang racket
-(require (only-in "../state/vector-var-a-list-state.rkt" var? veqv? walk))
+(require (only-in web-server/lang/serial-lambda serial-lambda)
+ (only-in "../state/p-state.rkt" var? veqv? walk))
 (provide ==)
 
 (define (== u v)
-  (lambda (s/c) ;; serial-lambda (s/c)
+  (serial-lambda (s/c) 
     (let ((s (unify u v (car s/c))))
       (if s (list (cons s (cdr s/c))) `()))))
 
