@@ -1,5 +1,5 @@
 #lang racket
-(require "mk.rkt" "extras-mk.rkt")
+(require "../miniKanren.rkt")
 (provide (all-defined-out))
 
 ;; test programs
@@ -22,37 +22,6 @@
              (reverseo b res)
              (appendo res `(,a) o))])))
 
-(define pappendo
-  (lambda (l s o)
-    (pconde
-     [(== l '()) (== o s)]
-     [(fresh (a b res)
-             (== l `(,a . ,b))
-             (== o `(,a . ,res))
-             (pappendo b s res))])))
-
-(define preverseo
-  (lambda (ls o)
-    (pconde
-     [(== ls '()) (== o ls)]
-     [(fresh (a b res)
-             (== `(,a . ,b) ls)
-             (preverseo b res)
-             (pappendo res `(,a) o))])))
-
-(define pappendo2
-  (lambda (l s o)
-    (pdisj
-     (conj (== l '()) (== o s))
-     (call/fresh
-      (lambda (a)
-        (call/fresh
-         (lambda (b)
-           (call/fresh
-            (lambda (res)
-              (conj (== l `(,a . ,b))
-                    (conj (== o `(,a . ,res))
-                          (lambda (s/c) (lambda () ((pappendo2 b s res) s/c))))))))))))))
 
 (define appendo2
   (lambda (l s o)

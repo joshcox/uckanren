@@ -86,7 +86,7 @@
 
 (define *o
   (lambda (n m p)
-    (conde
+    (pconde
       ((== '() n) (== '() p))
       ((poso n) (== '() m) (== '() p))
       ((== '(1) n) (poso m) (== m p))

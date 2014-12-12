@@ -1,9 +1,9 @@
 #lang racket
-(require "mk.rkt" "extras-mk.rkt" "test-programs.rkt" "numbers.rkt")
-(require C311/pmatch)
-;(require profile)
-;(require profile/render-text)
-(provide (all-defined-out) (all-from-out "test-programs.rkt"))
+(require "../miniKanren-base/p-miniKanren-base.rkt"
+         "../numbers/p-numbers.rkt"
+         "p-test-programs.rkt")
+(provide main)
+
 
 (define-syntax-rule (run/time th) (time-apply th '()))
 (define-syntax-rule (benchmark str bench) (cons str (lambda () bench)))
@@ -48,17 +48,12 @@
   (make-benchmark-suite
    "microKanren - nonInterpreter"
 
-   (benchmark "1000^2" (run 1 (q) (*o num1000 num1000 q)))
-   (benchmark "Parellel 1000^2" (run 1 (q) (p*o num1000 num1000 q)))
+   (benchmark "Parellel 1000^2" (run 1 (q) (*o num1000 num1000 q)))
 
-   (benchmark "2000^2" (run 1 (q) (*o num2000 num2000 q)))
-   (benchmark "Parellel 2000^2" (run 1 (q) (p*o num2000 num2000 q)))
+   (benchmark "Parellel 2000^2" (run 1 (q) (*o num2000 num2000 q)))
 
-   (benchmark "10000^2" (run 1 (q) (*o num10000 num10000 q)))
-   (benchmark "Parellel 10000^2" (run 1 (q) (p*o num10000 num10000 q)))
+   (benchmark "Parellel 10000^2" (run 1 (q) (*o num10000 num10000 q)))
    
-   (benchmark "two big items"
-              (run 2 (q) (disj (reverseo ls50 q) (reverseo ls50 q))))
    (benchmark "two big items"
               (run 2 (q) (pdisj (reverseo ls50 q) (reverseo ls50 q))))
    
@@ -78,3 +73,4 @@
 
 (define (main)
   (run-benchmark-suite* mk-runner microKanren-benchmarks))
+
