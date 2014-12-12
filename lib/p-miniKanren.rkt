@@ -6,5 +6,5 @@
          main)
 
 (define (main)
-  (run 1 (q) (== q 1)))
+  (run 3 (q) (pdisj (== q 3) (== q 2) (== q 1))))
 
