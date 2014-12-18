@@ -8,6 +8,7 @@
 (define make-a (lambda (s d c) (cons s (cons d c))))
 
 (define empty-a (make-a empty-s empty-d empty-c))
+(define (empty-state) (cons empty-a 0))
 
 (define (var n) (vector n))
 (define (var? n) (vector? n))
@@ -15,7 +16,30 @@
 (define (var-eqv? u v) (and (var? u) (var? v) (eqv? (unvar u) (unvar v))))
 (define veqv? (lambda (x y) (or (eqv? x y) (var-eqv? x y))))
 
-(define (empty-state) (cons empty-a 0))
+(define-syntax build-oc
+  (syntax-rules ()
+    ((_ op-c arg ...)
+     (build-oc-aux op-c (arg ...) () (arg ...)))))
+
+(define-syntax build-oc-aux  ;;; (op-c z ...) evaluates to a seq.
+  (syntax-rules ()
+    ((_  op-c () (z ...) (arg ...))
+     (let ((z arg) ...)
+       `(,(op-c z ...) op-c ,z ...)))
+    ((_ op-c (arg0 arg ...) (z ...) args)
+     (build-oc-aux op-c (arg ...) (z ... q) args))))
+
+(define oc->proc car)
+(define oc->rands cddr)
+(define oc->rator cadr)
+
+(define ext-d (lambda (x fd d) (cons `(,x . ,fd) d)))
+
+(define ext-c
+  (lambda (oc c)
+    (cond
+     ((any/var? (oc->rands oc)) (cons oc c))
+     (else c))))
 
 (define (walk u s)
   (let ((pr (and (var? u) (assoc u s var-eqv?))))

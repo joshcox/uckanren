@@ -1,6 +1,6 @@
 #lang racket
 (require (only-in "../state/cKanren-state.rkt" make-a var var?))
-(provide goal-construct lambdam@ prefix-s process-prefix)
+(provide goal-construct lambdam@ lambdas/c prefix-s process-prefix)
 
 (define unit (lambda (x) (cons x mzero)))
 (define mzero '())
@@ -35,34 +35,9 @@
        ((fm s/c) => unit)
        (else (mzero))))))
 
-(define-syntax build-oc
-  (syntax-rules ()
-    ((_ op-c arg ...)
-     (build-oc-aux op-c (arg ...) () (arg ...)))))
-
-(define-syntax build-oc-aux  ;;; (op-c z ...) evaluates to a seq.
-  (syntax-rules ()
-    ((_  op-c () (z ...) (arg ...))
-     (let ((z arg) ...)
-       `(,(op-c z ...) op-c ,z ...)))
-    ((_ op-c (arg0 arg ...) (z ...) args)
-     (build-oc-aux op-c (arg ...) (z ... q) args))))
-
 (define process-prefix (make-parameter (lambda (p c) identitym)))
 (define enforce-constraints (make-parameter (lambda (x) unit)))
 (define reify-constraints (make-parameter (lambda (m r) unit)))
-
-(define oc->proc car)
-(define oc->rands cddr)
-(define oc->rator cadr)
-
-(define ext-d (lambda (x fd d) (cons `(,x . ,fd) d)))
-
-(define ext-c
-  (lambda (oc c)
-    (cond
-     ((any/var? (oc->rands oc)) (cons oc c))
-     (else c))))
 
 (define any/var?
   (lambda (p)
@@ -84,23 +59,6 @@
 ;;(define succeed (== #f #f))
 ;;(define fail (== #f #t))
 ;;(define prt (lambda (a) (pretty-print a) (succeed a)))
-
-(define run-constraints0 ;;; unitm is a sequel
-  (lambda (x*-ignored c)
-    (cond
-     ((null? c) identitym)
-     (else
-      (composem (oc->proc (car c))
-                (run-constraints0 x*-ignored (cdr c)))))))
-
-(define run-constraints1 ;;; unitm is a sequel
-  (lambda (x* c)
-    (cond
-     ((null? c) identitym)
-     ((any-relevant/var? (oc->rands (car c)) x*)
-      (composem (oc->proc (car c))
-                (run-constraints1 x* (cdr c))))
-     (else (run-constraints1 x* (cdr c))))))
 
 (define run-constraints ;;; unitm is a sequel
   (lambda (x* c)
