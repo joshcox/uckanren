@@ -1,6 +1,6 @@
 #lang racket
 (require (only-in "../state/cKanren-state.rkt" make-a oc->proc oc->rands var var?))
-(provide enforce-constraints goal-construct lambdam@ lambdas/c prefix-s process-prefix reify-constraints run-constraints unit)
+(provide goal-construct lambdam@ lambdas/c prefix-s process-prefix run-constraints unit)
 
 (define unit (lambda (x) (cons x mzero)))
 (define mzero '())
@@ -37,8 +37,6 @@
        (else mzero)))))
 
 (define process-prefix (make-parameter (lambda (p c) identity)))
-(define enforce-constraints (make-parameter (lambda (x) unit)))
-(define reify-constraints (make-parameter (lambda (m r) unit)))
 
 (define prefix-s
   (lambda (s s^)

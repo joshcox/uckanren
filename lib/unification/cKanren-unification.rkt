@@ -17,7 +17,8 @@
                       (else
                        (let ((p (prefix-s s s^))
                              (a (make-a s^ d c)))
-                         (cons (((process-prefix) p c) a) cnt)))))) ;; used to have no cons
+                         (let ((a (((process-prefix) p c) a))) 
+                           (if a (cons a cnt) #f))))))) ;; used to have no cons
                (else #f)))))
 
 (define (unify x v s)

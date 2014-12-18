@@ -1,10 +1,12 @@
 #lang racket
 (require (only-in "../state/cKanren-state.rkt" 
-                  any/var? build-oc ext-c make-a oc->rands oc->rator var? walk*)
+                  any/var? build-oc empty-a enforce-constraints ext-c make-a oc->rands oc->rator reify-constraints var? walk*)
          (only-in "../constraint-framework/cKanren-framework.rkt" 
-                  enforce-constraints goal-construct lambdas/c prefix-s process-prefix reify-constraints run-constraints unit)
+                  goal-construct lambdas/c lambdam@ prefix-s process-prefix run-constraints unit)
          (only-in "../unification/cKanren-unification.rkt" == unify)
          (only-in "../miniKanren-base/cKanren-miniKanren-base.rkt" conde fresh))
+
+(provide =/= all-diffo useneq process-prefixneq enforce-constraintsneq reify-constraintsneq)
 
 (define lhs car)
 (define rhs cdr)
@@ -37,7 +39,7 @@
   (lambda (oc)
     (car (oc->rands oc))))
 
-(define enforce-constraintsneq (lambda (x) unit))
+(define enforce-constraintsneq identity)
 
 ;; (define reify-constraintsneq
 ;;   (lambda (m r)
@@ -55,7 +57,7 @@
 
 (define reify-constraintsneq
   (lambda (m r)
-    (lambdas/c (s/c : a cnt : s d c)
+    (lambdam@ (a : s d c)
               (let* ((c (walk* c r))
                      (p* (remp any/var? (map oc->prefix c))))
                 (cond
@@ -64,9 +66,9 @@
 
 (define =/=neq-c
   (lambda (p)
-    (lambdas/c (s/c : a cnt : s d c)
+    (lambdam@ (a : s d c)
       (cond
-       ((unify p s)
+       ((unify (caar p) (cdar p) s)
         =>
         (lambda (s^)
           (let ((p (prefix-s s s^)))
@@ -77,7 +79,7 @@
 
 (define normalize-store
   (lambda (p)
-    (lambdas/c (s/c : a cnt : s d c)
+    (lambdam@ (a : s d c)
       (let loop ((c c) (c^ '()))
         (cond
          ((null? c)
@@ -95,7 +97,7 @@
 (define subsumes?
   (lambda (p s)
     (cond
-     ((unify p s)
+     ((unify (caar p) (cdar p) s)
       => (lambda (s^) (eq? s s^)))
      (else #f))))
 
@@ -120,10 +122,10 @@
   (lambda (u v)
     (lambdas/c (s/c : a cnt : s d c)
       (cond
-       ((unify `((,u . ,v)) s)
+       ((unify u v s)
         => (lambda (s^)
-             ((=/=neq-c (prefix-s s s^)) a)))
-       (else a)))))
+             (cons ((=/=neq-c (prefix-s s s^)) a) cnt)))
+       (else s/c)))))
 
 (define all-diffo
   (lambda (l)
@@ -143,3 +145,7 @@
     (process-prefix process-prefixneq)
     (enforce-constraints enforce-constraintsneq)
     (reify-constraints reify-constraintsneq)))
+
+;; (require racket/trace)
+;; (trace =/= =/=-c =/=neq-c all-diffo useneq process-prefixneq enforce-constraintsneq 
+;;        normalize-store reify-constraintsneq recover/vars)

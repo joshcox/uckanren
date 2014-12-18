@@ -1,5 +1,9 @@
 #lang racket
-(provide any/var? build-oc empty-state ext-c ext-d make-a oc->proc oc->rands oc->rator reify-var0 var var? veqv? walk walk*)
+(provide any/var? build-oc enforce-constraints empty-a empty-state ext-c ext-d make-a oc->proc oc->rands oc->rator reify-constraints reify-var0 var var? veqv? walk walk*)
+
+(define unit (lambda (x) (cons x '())))
+(define enforce-constraints (make-parameter (lambda (x) unit)))
+(define reify-constraints (make-parameter (lambda (m r) unit)))
 
 (define empty-s '())
 (define empty-d '())
@@ -61,10 +65,32 @@
       (else v))))
 
 ;;might need to do something here since s/c is an a
-(define (reify-var0 s/c)
-  (let ((s/c (car s/c)))
-    (let ((v (walk* (var 0) (car s/c))))
-      (walk* v (reify-s v '())))))
+
+(define reify-var0
+  (lambda (s/c)
+    (let* ((a (car s/c)) (cnt (cdr s/c))
+           (s (car a)) (d (cdr a)) (c (cddr a)))
+      (let ((a ((enforce-constraints) a)))
+        (let ((v (walk* (var 0) s)))
+          (let ((r (reify-s v '())))
+            (let ((v (walk* v r)))
+              (if (null? c) v (((reify-constraints) v r) a)))))))))
+
+;; (define (reify-var0 s/c)
+;;   (let ((s/c (car s/c)))
+;;     (let ((s/c ((enforce-constraints) (car s/c))))
+;;       (if s/c 
+;;           (let ((v (walk* (var 0) s/c)))
+;;             (walk* v (reify-s v '())))
+;;           '()))))
+
+;; (cond
+;;  ((null? r) v)
+;;  (else
+;;   (let ((v (walk* v r)))
+;;     (cond
+;;      ((null? c) v)
+;;      (else (((reify-constraints) v r) a))))))
 
 (define (reify-s v s)
   (let ((v (walk v s)))
@@ -80,4 +106,4 @@
     (string-append "_." (number->string n))))
 
 ;; (require racket/trace)
-;; (trace empty-state make-a oc->proc oc->rands reify-var0 var var? veqv? walk walk*)
+;; (trace empty-state make-a oc->proc oc->rands reify-var0 var var? veqv? walk walk* reify-s)
