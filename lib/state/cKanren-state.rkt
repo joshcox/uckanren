@@ -1,5 +1,5 @@
 #lang racket
-(provide empty-state make-a reify-var0 var var? veqv? walk walk*)
+(provide empty-state make-a oc->proc oc->rands reify-var0 var var? veqv? walk walk*)
 
 (define empty-s '())
 (define empty-d '())
@@ -29,6 +29,14 @@
     ((_ op-c (arg0 arg ...) (z ...) args)
      (build-oc-aux op-c (arg ...) (z ... q) args))))
 
+(define any/var?
+  (lambda (p)
+    (cond
+     ((var? p) #t)
+     ((pair? p)
+      (or (any/var? (car p)) (any/var? (cdr p))))
+     (else #f))))
+
 (define oc->proc car)
 (define oc->rands cddr)
 (define oc->rator cadr)
@@ -54,8 +62,9 @@
 
 ;;might need to do something here since s/c is an a
 (define (reify-var0 s/c)
-  (let ((v (walk* (var 0) (car s/c))))
-    (walk* v (reify-s v '()))))
+  (let ((s/c (car s/c)))
+    (let ((v (walk* (var 0) (car s/c))))
+      (walk* v (reify-s v '())))))
 
 (define (reify-s v s)
   (let ((v (walk v s)))

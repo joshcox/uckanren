@@ -1,5 +1,5 @@
 #lang racket/base
-(require rackunit rackunit/text-ui "../miniKanren.rkt" "test-programs.rkt")
+(require rackunit rackunit/text-ui "../cKanren.rkt" "test-programs.rkt")
 (provide (all-defined-out))
 
 (define member?

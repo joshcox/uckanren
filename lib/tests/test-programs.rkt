@@ -89,15 +89,6 @@
              (facto a b)
              (*o b n o))])))
 
-(define reverseo
-  (lambda (ls o)
-    (conde
-     [(== ls '()) (== o ls)]
-     [(fresh (a b res)
-             (== `(,a . ,b) ls)
-             (reverseo b res)
-             (appendo res `(,a) o))])))
-
 (define lengtho
   (lambda (ls o)
     (conde
