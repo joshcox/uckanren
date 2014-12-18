@@ -20,7 +20,8 @@
          body)))
     ((_ (a) body) (lambda (a) body))))
 
-(define identitym (lambdam@ (a) a))
+; just going to use identity
+;(define identitym (lambdam@ (a) a))
 
 (define composem
   (lambda (fm f^m)
@@ -35,7 +36,7 @@
        ((fm s/c) => unit)
        (else (mzero))))))
 
-(define process-prefix (make-parameter (lambda (p c) identitym)))
+(define process-prefix (make-parameter (lambda (p c) identity)))
 (define enforce-constraints (make-parameter (lambda (x) unit)))
 (define reify-constraints (make-parameter (lambda (m r) unit)))
 
@@ -63,7 +64,7 @@
 (define run-constraints ;;; unitm is a sequel
   (lambda (x* c)
     (cond
-     ((null? c) identitym)
+     ((null? c) identity)
      ((any-relevant/var? (oc->rands (car c)) x*)
       (composem (rem/run (car c))
                 (run-constraints x* (cdr c))))
