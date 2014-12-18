@@ -2,7 +2,7 @@
 (require (only-in "../state/cKanren-state.rkt" var? veqv? walk make-a)
          (only-in "../constraint-framework/cKanren-framework.rkt" 
                   goal-construct lambdam@ lambdas/c prefix-s process-prefix))
-(provide ==)
+(provide == unify)
 
 (define == (lambda (u v) (goal-construct (==-c u v))))
 

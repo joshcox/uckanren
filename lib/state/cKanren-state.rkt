@@ -1,5 +1,5 @@
 #lang racket
-(provide empty-state make-a oc->proc oc->rands reify-var0 var var? veqv? walk walk*)
+(provide any/var? build-oc empty-state ext-c ext-d make-a oc->proc oc->rands oc->rator reify-var0 var var? veqv? walk walk*)
 
 (define empty-s '())
 (define empty-d '())
