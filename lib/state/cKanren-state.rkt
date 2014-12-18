@@ -78,3 +78,6 @@
 (define (reify-name n)
   (string->symbol
     (string-append "_." (number->string n))))
+
+;; (require racket/trace)
+;; (trace empty-state make-a oc->proc oc->rands reify-var0 var var? veqv? walk walk*)

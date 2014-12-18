@@ -52,3 +52,6 @@
 (define-syntax inverse-eta-delay
   (syntax-rules ()
     ((_ g) (lambda (s/c) (lambda () (g s/c))))))
+
+;; (require racket/trace)
+;; (trace $-append $-append-map disj conj call/fresh take call/empty-state)

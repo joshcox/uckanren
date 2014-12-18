@@ -39,3 +39,6 @@
      ((var? v) (veqv? v x))
      ((pair? v) (or (occurs? x (car v) s) (occurs? x (cdr v) s)))
      (else #f))))
+
+;; (require racket/trace)
+;; (trace == ==-c unify ext-s occurs?)

@@ -1,5 +1,5 @@
 #lang racket
-(require "../cKanren.rkt" "test-programs.rkt")
+(require "../cKanren.rkt" "cKanren-test-programs.rkt")
 (provide main)
 
 (define main

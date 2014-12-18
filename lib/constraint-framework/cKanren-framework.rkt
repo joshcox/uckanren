@@ -5,13 +5,6 @@
 (define unit (lambda (x) (cons x mzero)))
 (define mzero '())
 
-(define-syntax lambdas/c
-  (syntax-rules (:)
-    ((_ (s/c : a cnt : s d c) body)
-     (lambda (s/c)
-       (let ((a (car s/c)) (cnt (cdr s/c)))
-         ((lambdam@ (a : s d c) body) a))))))
-
 (define-syntax lambdam@
   (syntax-rules (:)
     ((_ (a : s d c) body)
@@ -19,6 +12,13 @@
        (let ((s (car a)) (d (cadr a)) (c (cddr a)))
          body)))
     ((_ (a) body) (lambda (a) body))))
+
+(define-syntax lambdas/c
+  (syntax-rules (:)
+    ((_ (s/c : a cnt : s d c) body)
+     (lambda (s/c)
+       (let ((a (car s/c)) (cnt (cdr s/c)))
+         ((lambdam@ (a : s d c) body) a))))))
 
 ; just going to use identity
 ;(define identitym (lambdam@ (a) a))
@@ -34,7 +34,7 @@
     (lambda (s/c)
       (cond
        ((fm s/c) => unit)
-       (else (mzero))))))
+       (else mzero)))))
 
 (define process-prefix (make-parameter (lambda (p c) identity)))
 (define enforce-constraints (make-parameter (lambda (x) unit)))
@@ -108,3 +108,6 @@
 ;;                              ((null? c) v)
 ;;                              (else (((reify-constraints) v r) a)))))))
 ;;                       empty-f)))))
+
+;; (require racket/trace)
+;; (trace goal-construct prefix-s process-prefix)
